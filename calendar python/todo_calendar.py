@@ -3,33 +3,37 @@ from tkinter import messagebox
 from tkcalendar import Calendar
 from datetime import datetime
 import csv
-import os
 
+# Task and employee management
 tasks = {}
 employees = []
 
-# Function to load tasks from the CSV file
+# Function to load tasks from CSV
 def load_tasks_from_csv():
-    if os.path.isfile('tasks.csv'):
-        with open('tasks.csv', 'r', newline='') as file:
+    try:
+        with open('tasks.csv', mode='r') as file:
             reader = csv.reader(file)
             next(reader)  # Skip the header row
             for row in reader:
-                date_str, task, employee = row
-                date_obj = datetime.strptime(date_str, "%Y-%m-%d").date()  # Convert to datetime.date
-                tasks.setdefault(date_obj, []).append((task, employee))
-        highlight_dates()  # Highlight the loaded dates on the calendar
+                if row:
+                    date_obj = datetime.strptime(row[0], "%m/%d/%y").date()
+                    task, employee = row[1], row[2]
+                    tasks.setdefault(date_obj, []).append((task, employee))
+        highlight_dates()
+    except FileNotFoundError:
+        pass
 
 # Function to save tasks to CSV
 def save_tasks_to_csv():
-    with open('tasks.csv', 'w', newline='') as file:
+    with open('tasks.csv', mode='w', newline='') as file:
         writer = csv.writer(file)
-        writer.writerow(['Date', 'Task', 'Employee'])  # Header for CSV
-        for date, task_list in tasks.items():
+        # Write the header row
+        writer.writerow(["Date", "Task", "Employee"])
+        for date_obj, task_list in tasks.items():
             for task, employee in task_list:
-                writer.writerow([date, task, employee])
+                writer.writerow([date_obj.strftime("%m/%d/%y"), task, employee])
 
-# Add task function
+# Add task
 def add_task():
     task = task_entry.get()
     date_str = cal.get_date()
@@ -39,12 +43,12 @@ def add_task():
         task_list.insert(tk.END, f"{date_str}: {task} (Assigned to {employee})")
         tasks.setdefault(date_obj, []).append((task, employee))
         task_entry.delete(0, tk.END)
-        save_tasks_to_csv()  # Save to CSV after adding a task
         highlight_dates()
+        save_tasks_to_csv()  # Save to CSV after adding
     else:
         messagebox.showwarning("Warning", "Task and employee must be selected!")
 
-# Remove task function
+# Remove task (only from UI, not from the underlying data)
 def remove_task():
     try:
         selected_task = task_list.curselection()[0]
@@ -54,22 +58,66 @@ def remove_task():
         task, employee = task_employee.rsplit(" (Assigned to ", 1)
         employee = employee.rstrip(")")
         date_obj = datetime.strptime(date_str, "%m/%d/%y").date()
+        # Simply remove from the UI, but don't delete from the tasks dictionary
         tasks[date_obj] = [t for t in tasks[date_obj] if t[1] != employee and t[0] != task]
         if not tasks[date_obj]:
             del tasks[date_obj]
-        save_tasks_to_csv()  # Save to CSV after removing a task
         highlight_dates()
     except IndexError:
         messagebox.showwarning("Warning", "No task selected!")
 
-# Highlight dates on the calendar
+# Edit task
+def edit_task():
+    try:
+        selected_task = task_list.curselection()[0]
+        task_text = task_list.get(selected_task)
+        date_str, task_employee = task_text.split(": ", 1)
+        task, employee = task_employee.rsplit(" (Assigned to ", 1)
+        employee = employee.rstrip(")")
+
+        # Parse the date and convert it to date object
+        date_obj = datetime.strptime(date_str, "%m/%d/%y").date()
+
+        # Populate the task and employee into the entry field
+        task_entry.delete(0, tk.END)
+        task_entry.insert(0, task)
+
+        # Remove the task from the list to edit it later
+        task_list.delete(selected_task)
+
+        # Add a save button for the edited task
+        def save_edited_task():
+            new_task = task_entry.get()
+            if new_task:
+                # Insert the updated task back into the list
+                task_list.insert(tk.END, f"{date_str}: {new_task} (Assigned to {employee})")
+
+                # Update the task in the tasks dictionary
+                tasks[date_obj] = [(new_task, employee) if t[0] == task else t for t in tasks[date_obj]]
+
+                # Clear the task entry field
+                task_entry.delete(0, tk.END)
+
+                # Re-highlight the dates
+                highlight_dates()
+                save_tasks_to_csv()  # Save to CSV after editing
+            else:
+                messagebox.showwarning("Warning", "Task cannot be empty!")
+
+        # Add a save button for the edited task
+        save_button = tk.Button(side_panel, text="Save Edited Task", command=save_edited_task, bg="#4CAF50", fg="white", font=("Arial", 12, "bold"), relief=tk.FLAT)
+        save_button.grid(row=5, column=0, sticky="ew", padx=10, pady=5)
+    except IndexError:
+        messagebox.showwarning("Warning", "No task selected for editing!")
+
+# Highlight dates with tasks
 def highlight_dates():
     cal.calevent_remove('all')  # Remove all previous highlights
     for date in tasks.keys():
         cal.calevent_create(date, 'Task', 'task')
     cal.tag_config('task', background='red', foreground='white')
 
-# Add employee function
+# Add employee
 def add_employee():
     employee_name = employee_entry.get()
     if employee_name:
@@ -79,7 +127,7 @@ def add_employee():
     else:
         messagebox.showwarning("Warning", "Employee name cannot be empty!")
 
-# Remove employee function
+# Remove employee
 def remove_employee():
     try:
         selected_employee = employee_listbox.curselection()[0]
@@ -89,7 +137,7 @@ def remove_employee():
     except IndexError:
         messagebox.showwarning("Warning", "No employee selected!")
 
-# Create the main window
+# Create main window
 root = tk.Tk()
 root.title("To-Do List Calendar")
 root.geometry("900x600")
@@ -143,12 +191,6 @@ employee_listbox.grid(row=2, column=0, sticky="nsew", padx=10, pady=5)
 # Remove employee button
 remove_employee_button = tk.Button(employee_frame, text="Remove Employee", command=remove_employee, bg="#f44336", fg="white", font=("Arial", 12, "bold"), relief=tk.FLAT)
 remove_employee_button.grid(row=3, column=0, sticky="ew", padx=10, pady=5)
-
-# Make task list expandable
-side_panel.rowconfigure(3, weight=1)
-
-# Load existing tasks from the CSV file at startup
-load_tasks_from_csv()
 
 # Run the application
 root.mainloop()
