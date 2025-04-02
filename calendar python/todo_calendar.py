@@ -3,9 +3,22 @@ from tkinter import messagebox
 from tkcalendar import Calendar
 from datetime import datetime
 import csv
+import os
 
 tasks = {}
 employees = []
+
+# Function to load tasks from the CSV file
+def load_tasks_from_csv():
+    if os.path.isfile('tasks.csv'):
+        with open('tasks.csv', 'r', newline='') as file:
+            reader = csv.reader(file)
+            next(reader)  # Skip the header row
+            for row in reader:
+                date_str, task, employee = row
+                date_obj = datetime.strptime(date_str, "%Y-%m-%d").date()  # Convert to datetime.date
+                tasks.setdefault(date_obj, []).append((task, employee))
+        highlight_dates()  # Highlight the loaded dates on the calendar
 
 # Function to save tasks to CSV
 def save_tasks_to_csv():
@@ -133,6 +146,9 @@ remove_employee_button.grid(row=3, column=0, sticky="ew", padx=10, pady=5)
 
 # Make task list expandable
 side_panel.rowconfigure(3, weight=1)
+
+# Load existing tasks from the CSV file at startup
+load_tasks_from_csv()
 
 # Run the application
 root.mainloop()
