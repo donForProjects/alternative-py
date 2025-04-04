@@ -4,6 +4,18 @@ from tkcalendar import Calendar
 from datetime import datetime
 import csv
 import os
+import firebase_admin
+from firebase_admin import credentials
+from firebase_admin import auth
+
+# Initialize Firebase Admin SDK (if not already initialized elsewhere)
+try:
+    firebase_admin.get_app()  # Check if the app is already initialized
+except ValueError:
+    cred = credentials.Certificate("scheduler-employee-list-firebase-adminsdk-fbsvc-2f157ce48d.json")  # Replace with your service account key path
+    firebase_admin.initialize_app(cred)
+
+
 
 # Global variable for the logged-in user
 current_user = ""
@@ -21,25 +33,32 @@ def update_clock():
 def login_window():
     def authenticate():
         global current_user
-        username = username_entry.get()
+        username = username_entry.get()  # Email address
         password = password_entry.get()
 
-        # Simple authentication for demonstration
         if username and password:
-            # Check if username exists in the user file
-            with open(USER_FILE, mode='r') as file:
-                reader = csv.reader(file)
-                for row in reader:
-                    if row[0] == username and row[1] == password:
-                        current_user = username  # Set the logged-in username
-                        login_window_instance.destroy()  # Close login window
-                        root.deiconify()  # Show the main window
-                        user_label.config(text=f"Logged in as: {current_user}")  # Display logged-in user
-                        populate_employee_dropdown()  # Populate employee dropdown
-                        return
-                messagebox.showerror("Login Failed", "Invalid username or password!")
+            try:
+                # Sign in with email and password using Firebase Authentication
+                user = auth.get_user_by_email(username) # To test if User Exists
+                # Sign in with email and password using Firebase Authentication
+                auth.get_user(user.uid)
+                # If the user exists, proceed to sign in
+                try:
+                    # Sign in with email and password using Firebase Authentication
+                    result = auth.get_user_by_email(username) # Dummy authentication
+                    current_user = username  # Set the logged-in username (email)
+                    login_window_instance.destroy()  # Close login window
+                    root.deiconify()  # Show the main window
+                    user_label.config(text=f"Logged in as: {current_user}")  # Display logged-in user
+                    populate_employee_dropdown()  # Populate employee dropdown
+                except:
+                    messagebox.showerror("Login Failed", "Invalid Password")
+            except auth.UserNotFoundError:
+                messagebox.showerror("Login Failed", "User not found. Please register.")
+            except Exception as e:
+                messagebox.showerror("Login Failed", f"An error occurred: {e}")
         else:
-            messagebox.showerror("Input Error", "Please enter both username and password!")
+            messagebox.showerror("Input Error", "Please enter both email and password!")
 
     def show_register_window():
         login_window_instance.destroy()
@@ -75,28 +94,30 @@ def login_window():
 # Register Window Function
 def register_window():
     def register_user():
-        username = username_entry.get()
+        username = username_entry.get()  # Use email as username with firebase Auth
         password = password_entry.get()
 
         if username and password:
-            # Check if the username already exists
-            with open(USER_FILE, mode='r') as file:
-                reader = csv.reader(file)
-                for row in reader:
-                    if row[0] == username:
-                        messagebox.showerror("Registration Failed", "Username already exists!")
-                        return
-            
-            # If username is unique, register the user
-            with open(USER_FILE, mode='a', newline='') as file:
-                writer = csv.writer(file)
-                writer.writerow([username, password])
+            try:
+                # Create user in Firebase Authentication
+                user = auth.create_user(
+                    email=username,  # Firebase Auth uses email as the primary identifier
+                    password=password
+                )
 
-            messagebox.showinfo("Registration Successful", "You have successfully registered!")
-            register_window_instance.destroy()
-            login_window()
+                messagebox.showinfo("Registration Successful", "You have successfully registered!")
+                register_window_instance.destroy()
+                login_window() # Calls the Login Window again
+            except auth.EmailAlreadyExistsError:
+                messagebox.showerror("Registration Failed", "Email address is already in use.")
+            except auth.InvalidEmailError:
+                messagebox.showerror("Registration Failed", "Invalid email address.")
+            except auth.WeakPasswordError:
+                messagebox.showerror("Registration Failed", "Password must be at least 6 characters long.") # Firebase password requirements
+            except Exception as e:
+                messagebox.showerror("Registration Failed", f"An error occurred: {e}")
         else:
-            messagebox.showerror("Input Error", "Please enter both username and password!")
+            messagebox.showerror("Input Error", "Please enter both email and password!")
 
     # Create Register Window
     register_window_instance = tk.Toplevel()
