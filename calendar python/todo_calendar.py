@@ -11,6 +11,12 @@ current_user = ""
 # File to store users' credentials
 USER_FILE = "users.csv"
 
+#the clock
+def update_clock():
+    now = datetime.now().strftime("%I:%M:%S %p")
+    clock_frame.config(text=now)
+    root.after(1000, update_clock) 
+
 # Login Window Function
 def login_window():
     def authenticate():
@@ -274,23 +280,28 @@ side_panel.grid(row=0, column=1, sticky="nsew")
 side_panel.columnconfigure(0, weight=1)
 side_panel.rowconfigure(3, weight=1)
 
+#deputa
+clock_frame = ttk.Label(side_panel, font=("Arial", 16))
+clock_frame.grid(row=0, column=0, sticky="ew",padx=5,pady=5)
+update_clock()
+
 # Task Entry
 task_entry = ttk.Entry(side_panel, width=30, font=("Arial", 12))
-task_entry.grid(row=0, column=0, sticky="ew", padx=5, pady=5)
+task_entry.grid(row=1, column=0, sticky="ew", padx=5, pady=5)
 
 add_button = ttk.Button(side_panel, text="Add Task", command=add_task)
-add_button.grid(row=1, column=0, sticky="ew", padx=5, pady=5)
+add_button.grid(row=1, column=1, sticky="w", padx=2, pady=5)
 
 remove_button = ttk.Button(side_panel, text="Remove Task", command=remove_task)
-remove_button.grid(row=2, column=0, sticky="ew", padx=5, pady=5)
+remove_button.grid(row=1, column=5, sticky="e", padx=2, pady=5)
 
 # Employee Listbox instead of Dropdown
 employee_label = ttk.Label(side_panel, text="Assign Employee:", background="#2C2F33", foreground="white")
-employee_label.grid(row=4, column=0, pady=5)
+employee_label.grid(row=3, column=0, pady=5)
 
 # Create the listbox for employees
 employee_listbox = tk.Listbox(side_panel, height=6, font=("Arial", 12), selectmode=tk.SINGLE)
-employee_listbox.grid(row=5, column=0, pady=5, padx=5)
+employee_listbox.grid(row=4, column=0, pady=5, padx=5)
 
 # Add the list of employees to the listbox
 # Function to populate the employee listbox
@@ -308,8 +319,8 @@ def populate_employee_dropdown():
 
 
 # Task Table (Treeview) with Fixed Height
-task_frame = ttk.Frame(side_panel, width=400, height=200)
-task_frame.grid(row=6, column=0, sticky="ew", padx=5, pady=5)
+task_frame = ttk.Frame(side_panel, width=600, height=200)
+task_frame.grid(row=2, column=0, sticky="ew", padx=3, pady=3)
 task_frame.grid_propagate(False)
 
 # Create Scrollbars for Treeview
