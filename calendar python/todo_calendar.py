@@ -12,7 +12,7 @@ from firebase_admin import auth
 try:
     firebase_admin.get_app()  # Check if the app is already initialized
 except ValueError:
-    cred = credentials.Certificate("scheduler-employee-list-firebase-adminsdk-fbsvc-2f157ce48d.json")  # Replace with your service account key path
+    cred = credentials.Certificate("scheduler-employee-list-firebase-adminsdk-fbsvc-bc5cd01a14.json")  # Replace with your service account key path
     firebase_admin.initialize_app(cred)
 
 
@@ -22,6 +22,8 @@ current_user = ""
 
 # File to store users' credentials
 USER_FILE = "users.csv"
+
+Time_list = ['6:00 AM','6:30 AM','7:00 AM','7:30 AM','8:00 AM','8:30 AM','9:00 AM','10:00 AM','11:00 AM','12:00 NN','1:00 PM','2:00 PM','3:00 PM','4:00 PM','5:00 PM']
 
 #the clock
 def update_clock():
@@ -231,8 +233,11 @@ def load_tasks_from_csv():
     except FileNotFoundError:
         pass
 
-# Function to add tasks
-# Function to add tasks
+
+
+
+
+# Update the add_task function to include the time
 def add_task():
     task = task_entry.get()
     date_str = cal.get_date()
@@ -246,16 +251,19 @@ def add_task():
         messagebox.showwarning("Warning", "Please select an employee!")
         return
 
-    if task and employee:
+    # Get the selected time from the time dropdown
+    selected_time = time_combobox.get()
+
+    if task and employee and selected_time:
         # In the add_task function
         status = "Upcoming" if date_obj > datetime.today().date() else "Ongoing" if date_obj == datetime.today().date() else "Done"
-        task_treeview.insert("", "end", values=(date_obj.strftime("%b/%d/%y"), task, employee, status))
-        tasks.setdefault(date_obj, []).append((task, employee, status))
+        task_treeview.insert("", "end", values=(date_obj.strftime("%b/%d/%y"), task, employee, selected_time, status))
+        tasks.setdefault(date_obj, []).append((task, employee, selected_time, status))
         task_entry.delete(0, tk.END)
         highlight_dates()
         save_tasks_to_csv()
     else:
-        messagebox.showwarning("Warning", "Task cannot be empty!")
+        messagebox.showwarning("Warning", "Task, employee, and time must be selected!")
 
 
 # Function to remove task
@@ -284,6 +292,7 @@ def remove_task():
     else:
         messagebox.showwarning("Warning", "No task selected!")
 
+
 # Create Calendar (Fixed Size)
 calendar_frame = tk.Frame(root, width=700, height=600)  # Increased size
 calendar_frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
@@ -300,6 +309,28 @@ side_panel = ttk.Frame(root, padding=10)
 side_panel.grid(row=0, column=1, sticky="nsew")
 side_panel.columnconfigure(0, weight=1)
 side_panel.rowconfigure(3, weight=1)
+
+# #Time Dropdown
+# time_label = ttk.Label(side_panel, text="Start Time:", background="#2C2F33", foreground="white")
+# time_label.grid(row=3, column=2, pady=5)
+
+# # Create the time dropdown (Combobox)
+# time_combobox = ttk.Combobox(side_panel, values=Time_list, width=20, font=("Arial", 12))
+# time_combobox.grid(row=4, column=2, pady=5, padx=5)
+
+# # Set default value for the time combobox (e.g., the first item in the Time_list)
+# time_combobox.set(Time_list[0])  # Default to 6:00 AM or whatever time you prefer
+
+# #Time Dropdown
+# time_label = ttk.Label(side_panel, text="End Time:", background="#2C2F33", foreground="white")
+# time_label.grid(row=3, column=3, pady=5)
+
+# # Create the time dropdown (Combobox)
+# time_combobox = ttk.Combobox(side_panel, values=Time_list, width=20, font=("Arial", 12))
+# time_combobox.grid(row=4, column=3, pady=5, padx=5)
+
+# # Set default value for the time combobox (e.g., the first item in the Time_list)
+# time_combobox.set(Time_list[0])  # Default to 6:00 AM or whatever time you prefer
 
 #deputa
 clock_frame = ttk.Label(side_panel, font=("Arial", 16))
