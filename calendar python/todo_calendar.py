@@ -4,18 +4,6 @@ from tkcalendar import Calendar
 from datetime import datetime
 import csv
 import os
-import firebase_admin
-from firebase_admin import credentials
-from firebase_admin import auth
-
-# Initialize Firebase Admin SDK (if not already initialized elsewhere)
-try:
-    firebase_admin.get_app()  # Check if the app is already initialized
-except ValueError:
-    cred = credentials.Certificate("scheduler-employee-list-firebase-adminsdk-fbsvc-bc5cd01a14.json")  # Replace with your service account key path
-    firebase_admin.initialize_app(cred)
-
-
 
 # Global variable for the logged-in user
 current_user = ""
@@ -23,179 +11,136 @@ current_user = ""
 # File to store users' credentials
 USER_FILE = "users.csv"
 
-Time_list = ['6:00 AM','6:30 AM','7:00 AM','7:30 AM','8:00 AM','8:30 AM','9:00 AM','10:00 AM','11:00 AM','12:00 NN','1:00 PM','2:00 PM','3:00 PM','4:00 PM','5:00 PM']
-
-#the clock
-def update_clock():
-    now = datetime.now().strftime("%I:%M:%S %p")
-    clock_frame.config(text=now)
-    root.after(1000, update_clock) 
-
 # Login Window Function
 def login_window():
     def authenticate():
         global current_user
-        username = username_entry.get()  # Email address
+        username = username_entry.get()
         password = password_entry.get()
 
         if username and password:
-            try:
-                # Sign in with email and password using Firebase Authentication
-                user = auth.get_user_by_email(username) # To test if User Exists
-                # Sign in with email and password using Firebase Authentication
-                auth.get_user(user.uid)
-                # If the user exists, proceed to sign in
-                try:
-                    # Sign in with email and password using Firebase Authentication
-                    result = auth.get_user_by_email(username) # Dummy authentication
-                    current_user = username  # Set the logged-in username (email)
-                    login_window_instance.destroy()  # Close login window
-                    root.deiconify()  # Show the main window
-                    user_label.config(text=f"Logged in as: {current_user}")  # Display logged-in user
-                    populate_employee_dropdown()  # Populate employee dropdown
-                except:
-                    messagebox.showerror("Login Failed", "Invalid Password")
-            except auth.UserNotFoundError:
-                messagebox.showerror("Login Failed", "User not found. Please register.")
-            except Exception as e:
-                messagebox.showerror("Login Failed", f"An error occurred: {e}")
+            with open(USER_FILE, mode='r') as file:
+                reader = csv.reader(file)
+                for row in reader:
+                    if row[0] == username and row[1] == password:
+                        current_user = username
+                        login_window_instance.destroy()
+                        root.deiconify()
+                        user_label.config(text=f"Logged in as: {current_user}")
+                        load_tasks_from_csv()
+                        return
+                messagebox.showerror("Login Failed", "Invalid username or password!")
         else:
-            messagebox.showerror("Input Error", "Please enter both email and password!")
+            messagebox.showerror("Input Error", "Please enter both username and password!")
 
     def show_register_window():
         login_window_instance.destroy()
         register_window()
 
-    # Create Login Window
     login_window_instance = tk.Toplevel()
     login_window_instance.title("Login")
-    login_window_instance.geometry("300x200")
-    login_window_instance.configure(bg="#2C2F33")
-    
-    label = ttk.Label(login_window_instance, text="Please login", font=("Arial", 16), background="#2C2F33", foreground="white")
-    label.pack(pady=20)
+    login_window_instance.geometry("300x220")
+    login_window_instance.configure(bg="#1E1E2E")
 
-    username_label = ttk.Label(login_window_instance, text="Username:", background="#2C2F33", foreground="white")
-    username_label.pack(pady=5)
+    label = ttk.Label(login_window_instance, text="Login", font=("Segoe UI", 14, "bold"))
+    label.pack(pady=10)
+
+    username_label = ttk.Label(login_window_instance, text="Username:")
+    username_label.pack()
     username_entry = ttk.Entry(login_window_instance)
     username_entry.pack(pady=5)
 
-    password_label = ttk.Label(login_window_instance, text="Password:", background="#2C2F33", foreground="white")
-    password_label.pack(pady=5)
+    password_label = ttk.Label(login_window_instance, text="Password:")
+    password_label.pack()
     password_entry = ttk.Entry(login_window_instance, show="*")
     password_entry.pack(pady=5)
 
     login_button = ttk.Button(login_window_instance, text="Login", command=authenticate)
-    login_button.pack(pady=20)
+    login_button.pack(pady=10)
 
     register_button = ttk.Button(login_window_instance, text="Register", command=show_register_window)
-    register_button.pack(pady=5)
+    register_button.pack()
 
     login_window_instance.mainloop()
 
-# Register Window Function
 def register_window():
     def register_user():
-        username = username_entry.get()  # Use email as username with firebase Auth
+        username = username_entry.get()
         password = password_entry.get()
 
         if username and password:
-            try:
-                # Create user in Firebase Authentication
-                user = auth.create_user(
-                    email=username,  # Firebase Auth uses email as the primary identifier
-                    password=password
-                )
+            with open(USER_FILE, mode='r') as file:
+                reader = csv.reader(file)
+                for row in reader:
+                    if row[0] == username:
+                        messagebox.showerror("Registration Failed", "Username already exists!")
+                        return
 
-                messagebox.showinfo("Registration Successful", "You have successfully registered!")
-                register_window_instance.destroy()
-                login_window() # Calls the Login Window again
-            except auth.EmailAlreadyExistsError:
-                messagebox.showerror("Registration Failed", "Email address is already in use.")
-            except auth.InvalidEmailError:
-                messagebox.showerror("Registration Failed", "Invalid email address.")
-            except auth.WeakPasswordError:
-                messagebox.showerror("Registration Failed", "Password must be at least 6 characters long.") # Firebase password requirements
-            except Exception as e:
-                messagebox.showerror("Registration Failed", f"An error occurred: {e}")
+            with open(USER_FILE, mode='a', newline='') as file:
+                writer = csv.writer(file)
+                writer.writerow([username, password])
+
+            messagebox.showinfo("Success", "You have successfully registered!")
+            register_window_instance.destroy()
+            login_window()
         else:
-            messagebox.showerror("Input Error", "Please enter both email and password!")
+            messagebox.showerror("Input Error", "Please enter both username and password!")
 
-    # Create Register Window
     register_window_instance = tk.Toplevel()
     register_window_instance.title("Register")
-    register_window_instance.geometry("300x200")
-    register_window_instance.configure(bg="#2C2F33")
+    register_window_instance.geometry("300x220")
+    register_window_instance.configure(bg="#1E1E2E")
 
-    label = ttk.Label(register_window_instance, text="Create an account", font=("Arial", 16), background="#2C2F33", foreground="white")
-    label.pack(pady=20)
+    label = ttk.Label(register_window_instance, text="Create Account", font=("Segoe UI", 14, "bold"))
+    label.pack(pady=10)
 
-    username_label = ttk.Label(register_window_instance, text="Username:", background="#2C2F33", foreground="white")
-    username_label.pack(pady=5)
+    username_label = ttk.Label(register_window_instance, text="Username:")
+    username_label.pack()
     username_entry = ttk.Entry(register_window_instance)
     username_entry.pack(pady=5)
 
-    password_label = ttk.Label(register_window_instance, text="Password:", background="#2C2F33", foreground="white")
-    password_label.pack(pady=5)
+    password_label = ttk.Label(register_window_instance, text="Password:")
+    password_label.pack()
     password_entry = ttk.Entry(register_window_instance, show="*")
     password_entry.pack(pady=5)
 
     register_button = ttk.Button(register_window_instance, text="Register", command=register_user)
-    register_button.pack(pady=20)
+    register_button.pack(pady=10)
 
     register_window_instance.mainloop()
 
-# Function to get all users from the users.csv file
-def get_all_users():
-    users = []
+def get_task_file():
+    return f"tasks_{current_user}.csv"
+
+def save_tasks_to_csv():
+    with open(get_task_file(), 'w', newline='') as file:
+        writer = csv.writer(file)
+        writer.writerow(["Date", "Task", "Employee", "Status"])
+        for date_obj, task_list in tasks.items():
+            for task, employee, status in task_list:
+                writer.writerow([date_obj.strftime("%m/%d/%y"), task, employee, status])
+
+def load_tasks_from_csv():
+    task_treeview.delete(*task_treeview.get_children())
+    tasks.clear()
     try:
-        with open(USER_FILE, mode='r') as file:
+        with open(get_task_file(), 'r') as file:
             reader = csv.reader(file)
+            next(reader)
             for row in reader:
-                users.append(row[0])  # Add username (first column) to the list
+                if len(row) >= 3:
+                    date_obj = datetime.strptime(row[0], "%m/%d/%y").date()
+                    task, employee, status = row[1], row[2], row[3] if len(row) > 3 else "Upcoming"
+                    tasks.setdefault(date_obj, []).append((task, employee, status))
+                    if status != "Removed":
+                        task_treeview.insert("", "end", values=(date_obj.strftime("%b/%d/%y"), task, employee, status))
+        highlight_dates()
     except FileNotFoundError:
         pass
-    return users
 
-# Function to populate the employee dropdown
-def populate_employee_dropdown():
-    users = get_all_users()  # Get all registered users
-    employee_listbox['values'] = users  # Update the combobox with the user list
-    if users:  # If there are users, select the first one by default
-        employee_listbox.set(users[0])
-
-# Initialize main application
-root = tk.Tk()
-root.title("Responsive To-Do Calendar")
-root.geometry("1000x650")
-root.configure(bg="#2C2F33")
-root.withdraw()  # Hide the main window initially
-
-# Label to show logged-in user
-user_label = ttk.Label(root, text="", font=("Arial", 14), background="#2C2F33", foreground="white")
-user_label.grid(row=0, column=0, columnspan=2, pady=10)
-
-# Configure grid to allocate more space to the calendar
-root.columnconfigure(0, weight=4)  # Calendar gets more space
-root.columnconfigure(1, weight=1)  # Side panel gets less space
-root.rowconfigure(0, weight=1)
-
-# Global Data Storage
-tasks = {}  # {date_obj: [(task, employee, status)]}
-employees = []
-
-# Color Mapping
-TASK_COLORS = {
-    "Upcoming": "blue",
-    "Ongoing": "yellow",
-    "Done": "green"
-}
-
-# Function to highlight dates with color-coded tasks
 def highlight_dates():
     cal.calevent_remove('all')
     today = datetime.today().date()
-
     for date, task_list in tasks.items():
         for task, employee, status in task_list:
             if date > today:
@@ -204,200 +149,153 @@ def highlight_dates():
                 status = "Ongoing"
             else:
                 status = "Done"
-            cal.calevent_create(date, f'Task: {status}', status)
-
+            if status != "Removed":
+                cal.calevent_create(date, f'Task: {status}', status)
     for status, color in TASK_COLORS.items():
         cal.tag_config(status, background=color, foreground="white")
 
-# Function to save tasks
-def save_tasks_to_csv():
-    with open('tasks.csv', 'w', newline='') as file:
-        writer = csv.writer(file)
-        writer.writerow(["Date", "Task", "Employee", "Status"])
-        for date_obj, task_list in tasks.items():
-            for task, employee, status in task_list:
-                writer.writerow([date_obj.strftime("%m/%d/%y"), task, employee, status])
-
-# Function to load tasks
-def load_tasks_from_csv():
-    try:
-        with open('tasks.csv', 'r') as file:
-            reader = csv.reader(file)
-            next(reader)  # Skip header
-            for row in reader:
-                if len(row) >= 3:
-                    date_obj = datetime.strptime(row[0], "%m/%d/%y").date()
-                    task, employee, status = row[1], row[2], row[3] if len(row) > 3 else "Upcoming"
-                    tasks.setdefault(date_obj, []).append((task, employee, status))
-        highlight_dates()
-    except FileNotFoundError:
-        pass
-
-
-
-
-
-# Update the add_task function to include the time
 def add_task():
     task = task_entry.get()
     date_str = cal.get_date()
     date_obj = datetime.strptime(date_str, "%m/%d/%y").date()
-
-    # Get the selected employee from the listbox
-    selected_employee_index = employee_listbox.curselection()  # Get the index of selected item
-    if selected_employee_index:
-        employee = employee_listbox.get(selected_employee_index)  # Get the selected employee
-    else:
-        messagebox.showwarning("Warning", "Please select an employee!")
-        return
-
-    # Get the selected time from the time dropdown
-    selected_time = time_combobox.get()
-
-    if task and employee and selected_time:
-        # In the add_task function
-        status = "Upcoming" if date_obj > datetime.today().date() else "Ongoing" if date_obj == datetime.today().date() else "Done"
-        task_treeview.insert("", "end", values=(date_obj.strftime("%b/%d/%y"), task, employee, selected_time, status))
-        tasks.setdefault(date_obj, []).append((task, employee, selected_time, status))
+    employee = current_user
+    if task:
+        # Assign status based on the task's date
+        if date_obj > datetime.today().date():
+            status = "Upcoming"
+        elif date_obj == datetime.today().date():
+            status = "Ongoing"  # Set to Ongoing if it's today's date
+        else:
+            status = "Done"
+        
+        task_treeview.insert("", "end", values=(date_obj.strftime("%b/%d/%y"), task, employee, status))
+        tasks.setdefault(date_obj, []).append((task, employee, status))
         task_entry.delete(0, tk.END)
         highlight_dates()
         save_tasks_to_csv()
     else:
-        messagebox.showwarning("Warning", "Task, employee, and time must be selected!")
+        messagebox.showwarning("Warning", "Task must be filled!")
 
-
-# Function to remove task
 def remove_task():
     selected_item = task_treeview.selection()
     if selected_item:
-        # Get selected task values
         item_values = task_treeview.item(selected_item, "values")
         if item_values:
             date_str, task, employee, status = item_values
             date_obj = datetime.strptime(date_str, "%b/%d/%y").date()
-
-            # Remove the task from the dictionary
             if date_obj in tasks:
-                tasks[date_obj] = [t for t in tasks[date_obj] if t[:2] != (task, employee)]
-                if not tasks[date_obj]:  # Remove empty date entry
-                    del tasks[date_obj]
-
-        # Remove task from Treeview
-        task_treeview.delete(selected_item)
-
-        # Refresh calendar highlights
-        highlight_dates()
-
-        # Save changes to CSV
+                tasks[date_obj] = [
+                    (t, e, "Removed") if (t == task and e == employee) else (t, e, s)
+                    for (t, e, s) in tasks[date_obj]
+                ]
+            task_treeview.delete(selected_item)
+            highlight_dates()
+            save_tasks_to_csv()
     else:
         messagebox.showwarning("Warning", "No task selected!")
 
+def mark_task_as_done():
+    selected_item = task_treeview.selection()
+    if selected_item:
+        item_values = task_treeview.item(selected_item, "values")
+        if item_values:
+            date_str, task, employee, _ = item_values
+            date_obj = datetime.strptime(date_str, "%b/%d/%y").date()
+            if date_obj in tasks:
+                # Update status to 'Done' instead of 'Removed'
+                tasks[date_obj] = [
+                    (t, e, "Done") if (t == task and e == employee) else (t, e, s)
+                    for (t, e, s) in tasks[date_obj]
+                ]
+            task_treeview.item(selected_item, values=(date_str, task, employee, "Done"))
+            highlight_dates()
+            save_tasks_to_csv()
+    else:
+        messagebox.showwarning("Warning", "No task selected!")
 
-# Create Calendar (Fixed Size)
-calendar_frame = tk.Frame(root, width=700, height=600)  # Increased size
-calendar_frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
-calendar_frame.grid_propagate(False)  # Prevent the frame from resizing
+def logout():
+    global current_user
+    current_user = ""
+    root.withdraw()
+    login_window()
 
-# Create Calendar inside the Frame
-cal = Calendar(calendar_frame, selectmode='day', background="#7289DA", 
-               foreground="white", selectbackground="darkblue")
-cal.pack(expand=True, fill="both")  # Expand to fill the frame
+# Sorting function to sort tasks by month
+def sort_by_month():
+    sorted_tasks = sorted(tasks.items(), key=lambda x: x[0].month)
+    task_treeview.delete(*task_treeview.get_children())  # Clear current Treeview
 
+    # Reload tasks in sorted order
+    for date_obj, task_list in sorted_tasks:
+        for task, employee, status in task_list:
+            if status != "Removed":
+                task_treeview.insert("", "end", values=(date_obj.strftime("%b/%d/%y"), task, employee, status))
 
-# Side Panel
-side_panel = ttk.Frame(root, padding=10)
-side_panel.grid(row=0, column=1, sticky="nsew")
-side_panel.columnconfigure(0, weight=1)
-side_panel.rowconfigure(3, weight=1)
+root = tk.Tk()
+root.title("To-Do Calendar")
+root.geometry("1050x680")
+root.configure(bg="#1E1E2E")
+root.withdraw()
 
-# #Time Dropdown
-# time_label = ttk.Label(side_panel, text="Start Time:", background="#2C2F33", foreground="white")
-# time_label.grid(row=3, column=2, pady=5)
+# Style Setup
+style = ttk.Style()
+style.theme_use("clam")
+style.configure("TLabel", background="#1E1E2E", foreground="white", font=("Segoe UI", 10))
+style.configure("TButton", background="#4C566A", foreground="white", font=("Segoe UI", 10), padding=6)
+style.map("TButton", background=[("active", "#5E81AC")])
+style.configure("TCombobox", fieldbackground="#3B4252", background="#3B4252", foreground="white")
+style.configure("Treeview", background="#2E3440", fieldbackground="#2E3440", foreground="white", font=("Segoe UI", 10))
+style.configure("Treeview.Heading", background="#4C566A", foreground="white", font=("Segoe UI", 10, "bold"))
 
-# # Create the time dropdown (Combobox)
-# time_combobox = ttk.Combobox(side_panel, values=Time_list, width=20, font=("Arial", 12))
-# time_combobox.grid(row=4, column=2, pady=5, padx=5)
+user_label = ttk.Label(root, text="")
+user_label.pack(anchor="w", padx=10, pady=(10, 0))
 
-# # Set default value for the time combobox (e.g., the first item in the Time_list)
-# time_combobox.set(Time_list[0])  # Default to 6:00 AM or whatever time you prefer
+logout_button = ttk.Button(root, text="🔒 Logout", command=logout)
+logout_button.pack(anchor="w", padx=10, pady=(0, 10))
 
-# #Time Dropdown
-# time_label = ttk.Label(side_panel, text="End Time:", background="#2C2F33", foreground="white")
-# time_label.grid(row=3, column=3, pady=5)
+main_frame = tk.Frame(root, bg="#1E1E2E")
+main_frame.pack(expand=True, fill="both", padx=10, pady=10)
 
-# # Create the time dropdown (Combobox)
-# time_combobox = ttk.Combobox(side_panel, values=Time_list, width=20, font=("Arial", 12))
-# time_combobox.grid(row=4, column=3, pady=5, padx=5)
+calendar_frame = tk.Frame(main_frame, bg="#1E1E2E")
+calendar_frame.pack(side="left", fill="both", expand=True)
 
-# # Set default value for the time combobox (e.g., the first item in the Time_list)
-# time_combobox.set(Time_list[0])  # Default to 6:00 AM or whatever time you prefer
+cal = Calendar(calendar_frame, selectmode='day', background="#3B4252", foreground="white",
+               selectbackground="#5E81AC", headersbackground="#4C566A", normalbackground="#2E3440",
+               normalforeground="white", weekendforeground="gray")
+cal.pack(padx=10, pady=10, fill="both", expand=True)
 
-#deputa
-clock_frame = ttk.Label(side_panel, font=("Arial", 16))
-clock_frame.grid(row=0, column=0, sticky="ew",padx=5,pady=5)
-update_clock()
+side_panel = tk.Frame(main_frame, bg="#1E1E2E")
+side_panel.pack(side="right", fill="y", padx=10)
 
 # Task Entry
-task_entry = ttk.Entry(side_panel, width=30, font=("Arial", 12))
-task_entry.grid(row=1, column=0, sticky="ew", padx=5, pady=5)
+task_entry = ttk.Entry(side_panel, font=("Segoe UI", 10))
+task_entry.pack(pady=5, fill="x")
 
-add_button = ttk.Button(side_panel, text="Add Task", command=add_task)
-add_button.grid(row=1, column=1, sticky="w", padx=2, pady=5)
+add_button = ttk.Button(side_panel, text="➕ Add Task", command=add_task)
+add_button.pack(pady=5, fill="x")
 
-remove_button = ttk.Button(side_panel, text="Remove Task", command=remove_task)
-remove_button.grid(row=1, column=5, sticky="e", padx=2, pady=5)
+remove_button = ttk.Button(side_panel, text="🗑️ Remove Task", command=remove_task)
+remove_button.pack(pady=5, fill="x")
 
-# Employee Listbox instead of Dropdown
-employee_label = ttk.Label(side_panel, text="Assign Employee:", background="#2C2F33", foreground="white")
-employee_label.grid(row=3, column=0, pady=5)
+mark_done_button = ttk.Button(side_panel, text="✅ Mark as Done", command=mark_task_as_done)
+mark_done_button.pack(pady=5, fill="x")
 
-# Create the listbox for employees
-employee_listbox = tk.Listbox(side_panel, height=6, font=("Arial", 12), selectmode=tk.SINGLE)
-employee_listbox.grid(row=4, column=0, pady=5, padx=5)
+# Add a button to trigger sorting by month
+sort_button = ttk.Button(side_panel, text="🔄 Sort by Month", command=sort_by_month)
+sort_button.pack(pady=5, fill="x")
 
-# Add the list of employees to the listbox
-# Function to populate the employee listbox
-# Function to populate the employee listbox
-def populate_employee_dropdown():
-    users = get_all_users()  # Get all registered users
-    employee_listbox.delete(0, tk.END)  # Clear the listbox first
-
-    # Add each user to the listbox
-    for user in users:
-        employee_listbox.insert(tk.END, user)  # Insert user into the listbox
-
-    if users:  # If there are users, select the first one by default
-        employee_listbox.select_set(0)
+# Treeview
+task_treeview = ttk.Treeview(side_panel, columns=("Date", "Task", "Employee", "Status"), show="headings")
+task_treeview.heading("Date", text="📅 Date")
+task_treeview.heading("Task", text="🗒️ Task")
+task_treeview.heading("Employee", text="👤 User")
+task_treeview.heading("Status", text="📌 Status")
+task_treeview.pack(pady=(20, 0), fill="both", expand=True)
+task_treeview.tag_configure("Upcoming", background="#3B4252")
+task_treeview.tag_configure("Ongoing", background="#4C566A")
+task_treeview.tag_configure("Done", background="#434C5E")
 
 
-# Task Table (Treeview) with Fixed Height
-task_frame = ttk.Frame(side_panel, width=600, height=200)
-task_frame.grid(row=2, column=0, sticky="ew", padx=3, pady=3)
-task_frame.grid_propagate(False)
+tasks = {}
+TASK_COLORS = {"Upcoming": "#5E81AC", "Ongoing": "#EBCB8B", "Done": "#A3BE8C"}
 
-# Create Scrollbars for Treeview
-tree_scroll_x = ttk.Scrollbar(task_frame, orient="horizontal")
-tree_scroll_x.pack(side="bottom", fill="x")
-
-tree_scroll_y = ttk.Scrollbar(task_frame, orient="vertical")
-tree_scroll_y.pack(side="right", fill="y")
-
-task_treeview = ttk.Treeview(task_frame, columns=("Date", "Task", "Employee", "Status"),
-                             show="headings", yscrollcommand=tree_scroll_y.set, 
-                             xscrollcommand=tree_scroll_x.set)
-task_treeview.pack(fill="none", expand=True)
-
-task_treeview.heading("Date", text="Date")
-task_treeview.heading("Task", text="Task")
-task_treeview.heading("Employee", text="Employee")
-task_treeview.heading("Status", text="Status")
-
-tree_scroll_y.config(command=task_treeview.yview)
-tree_scroll_x.config(command=task_treeview.xview)
-
-
-
-load_tasks_from_csv()
-
-# Start with the login window
 login_window()
