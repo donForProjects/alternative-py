@@ -4,6 +4,9 @@ from tkcalendar import Calendar
 from datetime import datetime
 import csv
 import os
+from reportlab.lib.pagesizes import letter
+from reportlab.lib import colors
+from reportlab.pdfgen import canvas
 
 # Global variable for the logged-in user
 current_user = ""
@@ -219,7 +222,6 @@ def logout():
     root.withdraw()
     login_window()
 
-# Sorting function to sort tasks by month
 def sort_by_month():
     sorted_tasks = sorted(tasks.items(), key=lambda x: x[0].month)
     task_treeview.delete(*task_treeview.get_children())  # Clear current Treeview
@@ -229,6 +231,30 @@ def sort_by_month():
         for task, employee, status in task_list:
             if status != "Removed":
                 task_treeview.insert("", "end", values=(date_obj.strftime("%b/%d/%y"), task, employee, status))
+
+def export_to_pdf():
+    file_name = f"tasks_{current_user}.pdf"
+    c = canvas.Canvas(file_name, pagesize=letter)
+    width, height = letter
+
+    c.setFont("Helvetica", 12)
+    y_position = height - 40
+    c.drawString(30, y_position, f"Tasks for {current_user}")
+    y_position -= 30
+
+    for item in task_treeview.get_children():
+        item_values = task_treeview.item(item, "values")
+        if item_values:
+            date_str, task, employee, status = item_values
+            c.drawString(30, y_position, f"{date_str} | {task} | {employee} | {status}")
+            y_position -= 20
+            if y_position < 50:
+                c.showPage()
+                c.setFont("Helvetica", 12)
+                y_position = height - 40
+
+    c.save()
+    messagebox.showinfo("Export Success", f"Tasks have been exported to {file_name}")
 
 root = tk.Tk()
 root.title("To-Do Calendar")
@@ -251,6 +277,9 @@ user_label.pack(anchor="w", padx=10, pady=(10, 0))
 
 logout_button = ttk.Button(root, text="🔒 Logout", command=logout)
 logout_button.pack(anchor="w", padx=10, pady=(0, 10))
+
+export_button = ttk.Button(root, text="📄 Export to PDF", command=export_to_pdf)
+export_button.pack(anchor="w", padx=10, pady=(0, 10))
 
 main_frame = tk.Frame(root, bg="#1E1E2E")
 main_frame.pack(expand=True, fill="both", padx=10, pady=10)
@@ -293,7 +322,6 @@ task_treeview.pack(pady=(20, 0), fill="both", expand=True)
 task_treeview.tag_configure("Upcoming", background="#3B4252")
 task_treeview.tag_configure("Ongoing", background="#4C566A")
 task_treeview.tag_configure("Done", background="#434C5E")
-
 
 tasks = {}
 TASK_COLORS = {"Upcoming": "#5E81AC", "Ongoing": "#EBCB8B", "Done": "#A3BE8C"}
