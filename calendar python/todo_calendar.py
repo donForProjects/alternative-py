@@ -22,7 +22,7 @@ current_user = ""
 USER_FILE = "users.csv"
 TASK_FILE = "tasks.csv"  # Shared task file for all users
 
-cred = credentials.Certificate("calendar-395f6-firebase-adminsdk-fbsvc-99a67778b6.json")
+cred = credentials.Certificate("calendar-395f6-firebase-adminsdk-fbsvc-ae48d22cc7.json")
 default_app = firebase_admin.initialize_app(cred, {
 'databaseURL': 'https://calendar-395f6-default-rtdb.firebaseio.com/'
 })
@@ -254,9 +254,6 @@ def add_task():
         messagebox.showwarning("Warning", "Task must be filled!")
 
 
-
-
-
 def remove_task():
     selected_item = task_treeview.selection()
     if selected_item:
@@ -264,11 +261,22 @@ def remove_task():
         if item_values:
             date_str, task, employee, status = item_values
             date_obj = datetime.strptime(date_str, "%b/%d/%y").date()
+
+            # Update tasks locally
             if date_obj in tasks:
                 tasks[date_obj] = [
                     (t, e, "Removed") if (t == task and e == employee) else (t, e, s)
                     for (t, e, s) in tasks[date_obj]
                 ]
+            
+            # Update the task in Firebase
+            task_ref = ref2.child(date_obj.strftime('%Y-%m-%d')).child(employee)
+            for task_id, task_info in task_ref.get().items():
+                if task_info.get('task') == task:
+                    task_ref.child(task_id).update({'status': 'Removed'})
+                    break
+            
+            # Remove the task from the Treeview
             task_treeview.delete(selected_item)
             highlight_dates()
             save_tasks_to_csv()
@@ -298,18 +306,28 @@ def mark_task_as_done():
 
         date_obj = datetime.strptime(date_str, "%b/%d/%y").date()
 
+        # Update tasks locally
         if date_obj in tasks:
             tasks[date_obj] = [
                 (t, e, "Done") if (t == task and e == employee) else (t, e, s)
                 for (t, e, s) in tasks[date_obj]
             ]
 
+        # Update the task in Firebase
+        task_ref = ref2.child(date_obj.strftime('%Y-%m-%d')).child(employee)
+        for task_id, task_info in task_ref.get().items():
+            if task_info.get('task') == task:
+                task_ref.child(task_id).update({'status': 'Done'})
+                break
+
+        # Update the Treeview
         task_treeview.item(selected_item, values=(date_str, task, employee, "Done"))
         highlight_dates()
         save_tasks_to_csv()
 
     except Exception as e:
         messagebox.showerror("Error", f"An unexpected error occurred:\n{e}")
+
 
 
 def logout():
