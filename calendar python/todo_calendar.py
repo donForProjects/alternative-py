@@ -11,6 +11,8 @@ from tkinter import filedialog
 import firebase_admin
 from firebase_admin import credentials
 from firebase_admin import db
+from plyer import notification
+
 
 # Initialize the tasks dictionary
 tasks = {}
@@ -244,10 +246,19 @@ def add_task():
         task_entry.delete(0, tk.END)
 
         # Update the calendar view and save tasks to CSV
+        notification.notify(
+            title="📝 Task Added",
+            message=f"{task_with_time} on {date_obj.strftime('%b %d, %Y')}",
+            timeout=5
+        )
+
+        # Update the calendar view and save tasks to CSV
         highlight_dates()
         save_tasks_to_csv()
 
         # Force reload of tasks from Firebase to synchronize the Treeview with the database
+        messagebox.showinfo("Task Added", f"Task added successfully:\n\nTask: {task_with_time}\nDate: {date_obj.strftime('%b %d, %Y')}")
+
         load_tasks_from_firebase()
 
     else:
@@ -382,6 +393,53 @@ def export_to_pdf():
     c.save()
     messagebox.showinfo("Exported", f"Tasks successfully exported to {file_path}")
 
+
+def export_selected_task_as_letter():
+    selected_item = task_treeview.selection()
+    if not selected_item:
+        messagebox.showwarning("Warning", "No task selected!")
+        return
+
+    item_values = task_treeview.item(selected_item, "values")
+    if not item_values:
+        messagebox.showerror("Error", "Unable to retrieve task information.")
+        return
+
+    date_str, task, employee, status = item_values
+
+    file_path = filedialog.asksaveasfilename(
+        defaultextension=".pdf",
+        filetypes=[("PDF files", "*.pdf")],
+        title="Export Task as Letter"
+    )
+
+    if not file_path:
+        return  # User cancelled
+
+    c = canvas.Canvas(file_path, pagesize=letter)
+    width, height = letter
+
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(100, height - 100, "Task Assignment Letter")
+    c.setFont("Helvetica", 12)
+    c.drawString(50, height - 140, f"Date Assigned: {date_str}")
+    c.drawString(50, height - 160, f"Assigned To: {employee}")
+    c.drawString(50, height - 180, f"Task: {task}")
+    c.drawString(50, height - 200, f"Status: {status}")
+    
+    c.drawString(50, height - 240, "Dear Ma'am/Sir,")
+    c.drawString(50, height - 260, f"You have been assigned the following task:")
+    c.drawString(70, height - 280, f"• {task}")
+    c.drawString(50, height - 300, "Please make sure to complete this task as scheduled.")
+    c.drawString(50, height - 340, "Sincerely,")
+    c.drawString(50, height - 360, f"{current_user}")
+
+    c.save()
+    messagebox.showinfo("Exported", f"Letter successfully exported to {file_path}")
+
+
+
+
 root = tk.Tk()
 root.title("To-Do Calendar")
 root.geometry("1050x680")
@@ -404,8 +462,17 @@ user_label.pack(anchor="w", padx=10, pady=(10, 0))
 logout_button = ttk.Button(root, text="🔒 Logout", command=logout)
 logout_button.pack(anchor="w", padx=10, pady=(0, 10))
 
-export_button = ttk.Button(root, text="📄 Export to PDF", command=export_to_pdf)
-export_button.pack(anchor="w", padx=10, pady=(0, 10))
+# Frame to hold the export buttons side by side
+export_buttons_frame = ttk.Frame(root)
+export_buttons_frame.pack(anchor="w", padx=10, pady=(0, 10))
+
+export_button = ttk.Button(export_buttons_frame, text="📄 Export to PDF", command=export_to_pdf)
+export_button.pack(side="left", padx=(0, 5))  # slight space between buttons
+
+export_letter_button = ttk.Button(export_buttons_frame, text="✉ Export as Letter", command=export_selected_task_as_letter)
+export_letter_button.pack(side="left")
+
+
 
 main_frame = tk.Frame(root, bg="#1E1E2E")
 main_frame.pack(expand=True, fill="both", padx=10, pady=10)
