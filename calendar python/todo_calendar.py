@@ -48,7 +48,7 @@ def login_window():
                login_window_instance.destroy()
                root.deiconify()
                user_label.config(text=f"Logged in as : {current_user}")
-               load_tasks_from_csv()
+               load_tasks_from_firebase()
 
            else:
                messagebox.showerror("Login failed", "Invalid username and password")
@@ -147,34 +147,46 @@ def save_tasks_to_csv():
 def load_tasks_from_firebase():
     task_treeview.delete(*task_treeview.get_children())  # Clear existing tasks
     tasks.clear()  # Clear the tasks before reloading
-    
+
     # Load tasks from Firebase
     try:
         # Get all tasks from Firebase under the '/Task' reference
         tasks_ref = db.reference("/Task")
         task_data = tasks_ref.get()  # This retrieves all tasks stored in Firebase
 
+        print("Fetched task_data:", task_data)  # Debug print to check data structure
+
         if task_data:
             # Iterate through the retrieved data and populate the task treeview
             for date_str, date_tasks in task_data.items():
-                for employee, employee_tasks in date_tasks.items():
-                    for task_entry in employee_tasks:
-                        task = task_entry.get('task')
-                        status = task_entry.get('status', "Upcoming")
-                        start_time = task_entry.get('start_time')
-                        end_time = task_entry.get('end_time')
+                try:
+                    # Loop through each employee under that date
+                    for employee, employee_tasks in date_tasks.items():
+                        print(f"Employee: {employee}, Tasks data: {employee_tasks}")  # Debug print
+                        
+                        # If the employee's tasks are stored as a dictionary (not a list), we handle it like this:
+                        if isinstance(employee_tasks, dict):
+                            task = employee_tasks.get('task')
+                            status = employee_tasks.get('status', "Upcoming")
+                            start_time = employee_tasks.get('start_time')
+                            end_time = employee_tasks.get('end_time')
 
-                        # Convert the Firebase stored date (YYYY-MM-DD) into a datetime object
-                        date_obj = datetime.strptime(date_str, "%Y-%m-%d").date()
+                            # Convert the Firebase stored date (YYYY-MM-DD) into a datetime object
+                            date_obj = datetime.strptime(date_str, "%Y-%m-%d").date()
 
-                        # Add the task to the tasks dictionary and the treeview
-                        tasks.setdefault(date_obj, []).append((task, employee, status))
-                        if status != "Removed":
-                            task_treeview.insert("", "end", values=(date_obj.strftime("%b/%d/%y"), task, employee, status))
+                            # Add the task to the tasks dictionary and the treeview
+                            tasks.setdefault(date_obj, []).append((task, employee, status))
+                            if status != "Removed":
+                                task_treeview.insert("", "end", values=(date_obj.strftime("%b/%d/%y"), task, employee, status))
+                        else:
+                            print(f"Error: Employee {employee} tasks data is not a dictionary.")
+                except Exception as e:
+                    print(f"Error processing tasks for date {date_str}: {e}")
 
         highlight_dates()  # Update date highlights on the calendar
     except Exception as e:
         print(f"Error loading tasks from Firebase: {e}")
+
 
 def highlight_dates():
     cal.calevent_remove('all')  # Clear previous highlights
