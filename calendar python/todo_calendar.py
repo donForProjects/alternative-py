@@ -264,6 +264,24 @@ def add_task():
     else:
         messagebox.showwarning("Warning", "Task must be filled!")
 
+def listen_for_changes():
+    def notify_all_users(event):
+        if event.event_type == 'put' and event.data and isinstance(event.data, dict):
+            path_parts = event.path.strip("/").split("/")
+            if len(path_parts) == 3:  # format: /YYYY-MM-DD/username/task_id
+                task_data = event.data
+                task = task_data.get("task", "Unknown Task")
+                employee = task_data.get("employee", "Someone")
+                date_str = path_parts[0]
+                notification.notify(
+                    title="📢 New Task Added",
+                    message=f"{employee} added: {task} on {date_str}",
+                    timeout=5  # seconds
+                )
+                load_tasks_from_firebase()  # Optional: refresh view
+
+    ref2.listen(notify_all_users)
+
 
 def remove_task():
     selected_item = task_treeview.selection()
