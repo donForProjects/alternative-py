@@ -54,7 +54,7 @@ def login_window():
 
            else:
                messagebox.showerror("Login failed", "Invalid username and password")
-        else:
+        else: 
             messagebox.showerror("Input Error", "Please enter both username and password!")
 
     def show_register_window():
@@ -146,6 +146,8 @@ def save_tasks_to_csv():
 
 
 
+from plyer import notification
+
 def load_tasks_from_firebase():
     task_treeview.delete(*task_treeview.get_children())  # Clear existing tasks
     tasks.clear()  # Clear the tasks before reloading
@@ -173,12 +175,16 @@ def load_tasks_from_firebase():
                         tasks.setdefault(date_obj, []).append((task, employee, status))
                         if status != "Removed":
                             task_treeview.insert("", "end", values=(date_obj.strftime("%b/%d/%y"), task, employee, status))
-
-        highlight_dates()  # Update date highlights on the calendar
+                        
+            # Trigger a notification to all users on task update
+            notification.notify(
+                title="Task Update",
+                message="A task has been added or updated in the system!",
+                timeout=10
+            )
+            highlight_dates()  # Update date highlights on the calendar
     except Exception as e:
         print(f"Error loading tasks from Firebase: {e}")
-
-
 
 
 
