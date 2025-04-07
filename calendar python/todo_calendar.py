@@ -12,6 +12,11 @@ import firebase_admin
 from firebase_admin import credentials
 from firebase_admin import db
 from plyer import notification
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from email.mime.application import MIMEApplication
+from tkinter import simpledialog
 
 
 # Initialize the tasks dictionary
@@ -24,7 +29,7 @@ current_user = ""
 USER_FILE = "users.csv"
 TASK_FILE = "tasks.csv"  # Shared task file for all users
 
-cred = credentials.Certificate("calendar-395f6-firebase-adminsdk-fbsvc-ae48d22cc7.json")
+cred = credentials.Certificate("calendar-395f6-firebase-adminsdk-fbsvc-c0746a57cf.json")
 default_app = firebase_admin.initialize_app(cred, {
 'databaseURL': 'https://calendar-395f6-default-rtdb.firebaseio.com/'
 })
@@ -461,7 +466,75 @@ def export_selected_task_as_letter():
     c.save()
     messagebox.showinfo("Exported", f"Letter successfully exported to {file_path}")
 
+def send_task_email():
+    selected_item = task_treeview.selection()
+    if not selected_item:
+        messagebox.showwarning("Warning", "No task selected!")
+        return
 
+    item_values = task_treeview.item(selected_item, "values")
+    if not item_values:
+        messagebox.showerror("Error", "Unable to retrieve task information.")
+        return
+
+    date_str, task, employee, status = item_values
+
+    # Ask for the recipient email address (the connected user's email)
+    recipient_email = simpledialog.askstring("Email", "Enter your email address:")
+    if not recipient_email:
+        messagebox.showerror("Error", "No email address entered.")
+        return
+
+    # Email content with improved subject and body
+    subject = f"Task Assigned: {task} for {employee} – {date_str}"
+    body = f"""
+    Hello,
+
+    This is a reminder about a task assigned to you:
+
+    Task: {task}
+    Assigned to: {employee}
+    Due Date: {date_str}
+    Status: {status}
+
+    Please take the necessary actions for this task at your earliest convenience.
+
+    If you have any questions or need further details, feel free to reach out.
+
+    Best regards,
+    Your Name
+    Your Job Title or Company Name
+    """
+
+    # SMTP server configuration
+    smtp_server = "smtp.gmail.com"  
+    smtp_port = 587  
+    sender_email = "reminderco05@gmail.com"  
+    sender_password = "wtxt djzs igiw fkis"  # Use an App Password for Gmail
+
+    try:
+        # Set up the server and login
+        server = smtplib.SMTP(smtp_server, smtp_port)
+        server.starttls()  
+        server.login(sender_email, sender_password)
+
+        # Create the email message
+        msg = MIMEMultipart()
+        msg["From"] = sender_email
+        msg["To"] = recipient_email
+        msg["Subject"] = subject
+
+        # Attach the email body
+        msg.attach(MIMEText(body, "plain"))
+
+        # Send the email
+        server.sendmail(sender_email, recipient_email, msg.as_string())
+        server.quit()
+
+        messagebox.showinfo("Success", "Email sent successfully!")
+
+    except Exception as e:
+        messagebox.showerror("Error", f"An error occurred while sending the email: {e}")
 
 
 root = tk.Tk()
@@ -495,6 +568,9 @@ export_button.pack(side="left", padx=(0, 5))  # slight space between buttons
 
 export_letter_button = ttk.Button(export_buttons_frame, text="✉ Export as Letter", command=export_selected_task_as_letter)
 export_letter_button.pack(side="left")
+
+send_email_button = ttk.Button(export_buttons_frame, text="📧 Send to Email", command=send_task_email)
+send_email_button.pack(side="left")
 
 
 
