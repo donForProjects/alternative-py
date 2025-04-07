@@ -147,47 +147,57 @@ def load_tasks_from_csv():
         pass
 
 def highlight_dates():
-    cal.calevent_remove('all')
-    today = datetime.today().date()
-    for date, task_list in tasks.items():
-        for task, employee, status in task_list:
-            if date > today:
-                status = "Upcoming"
-            elif date == today:
-                status = "Ongoing"
-            else:
-                status = "Done"
-            if status != "Removed":
-                cal.calevent_create(date, f'Task: {status}', status)
-    for status, color in TASK_COLORS.items():
-        cal.tag_config(status, background=color, foreground="white")
+    cal.calevent_remove('all')  # Clear previous highlights
+
+    for date_obj, task_list in tasks.items():
+        statuses = {status for _, _, status in task_list}
+        if "Ongoing" in statuses:
+            cal.calevent_create(date_obj, "Ongoing Task", "ongoing")
+        elif "Upcoming" in statuses:
+            cal.calevent_create(date_obj, "Upcoming Task", "upcoming")
+        elif "Done" in statuses:
+            cal.calevent_create(date_obj, "Done Task", "done")
+
+    # Apply tag colors
+    cal.tag_config("ongoing", background="orange", foreground="black")
+    cal.tag_config("upcoming", background="lightblue", foreground="black")
+    cal.tag_config("done", background="lightgreen", foreground="black")
+
 
 def add_task():
     task = task_entry.get()
     date_str = cal.get_date()
+    
     try:
-        # Adjusted the date format to handle "mm/dd/yyyy"
         date_obj = datetime.strptime(date_str, "%m/%d/%Y").date()
     except ValueError:
         messagebox.showerror("Date Format Error", f"Invalid date format: {date_str}")
         return
+
     employee = current_user
+
+    start_time = start_hour.get()
+    end_time = end_hour.get()
+    task_with_time = f"{task} ({start_time} - {end_time})"
+
     if task:
-        # Assign status based on the task's date
+        task_with_time = f"{task} ({start_time} - {end_time})"
+
         if date_obj > datetime.today().date():
             status = "Upcoming"
         elif date_obj == datetime.today().date():
-            status = "Ongoing"  # Set to Ongoing if it's today's date
+            status = "Ongoing"
         else:
             status = "Done"
-        
-        task_treeview.insert("", "end", values=(date_obj.strftime("%b/%d/%y"), task, employee, status))
-        tasks.setdefault(date_obj, []).append((task, employee, status))
+
+        task_treeview.insert("", "end", values=(date_obj.strftime("%b/%d/%y"), task_with_time, employee, status))
+        tasks.setdefault(date_obj, []).append((task_with_time, employee, status))
         task_entry.delete(0, tk.END)
         highlight_dates()
         save_tasks_to_csv()
     else:
         messagebox.showwarning("Warning", "Task must be filled!")
+
 
 
 def remove_task():
@@ -210,22 +220,40 @@ def remove_task():
 
 def mark_task_as_done():
     selected_item = task_treeview.selection()
-    if selected_item:
-        item_values = task_treeview.item(selected_item, "values")
-        if item_values:
-            date_str, task, employee, _ = item_values
-            date_obj = datetime.strptime(date_str, "%b/%d/%y").date()
-            if date_obj in tasks:
-                # Update status to 'Done' instead of 'Removed'
-                tasks[date_obj] = [
-                    (t, e, "Done") if (t == task and e == employee) else (t, e, s)
-                    for (t, e, s) in tasks[date_obj]
-                ]
-            task_treeview.item(selected_item, values=(date_str, task, employee, "Done"))
-            highlight_dates()
-            save_tasks_to_csv()
-    else:
+    if not selected_item:
         messagebox.showwarning("Warning", "No task selected!")
+        return
+
+    try:
+        item_values = task_treeview.item(selected_item, "values")
+        if not item_values:
+            messagebox.showerror("Error", "Unable to retrieve task information.")
+            return
+
+        date_str, task, employee, current_status = item_values
+        if current_status == "Done":
+            messagebox.showinfo("Already Done", "This task is already marked as done.")
+            return
+
+        confirm = messagebox.askyesno("Mark as Done", f"Are you sure you want to mark this task as done?\n\nTask: {task}")
+        if not confirm:
+            return
+
+        date_obj = datetime.strptime(date_str, "%b/%d/%y").date()
+
+        if date_obj in tasks:
+            tasks[date_obj] = [
+                (t, e, "Done") if (t == task and e == employee) else (t, e, s)
+                for (t, e, s) in tasks[date_obj]
+            ]
+
+        task_treeview.item(selected_item, values=(date_str, task, employee, "Done"))
+        highlight_dates()
+        save_tasks_to_csv()
+
+    except Exception as e:
+        messagebox.showerror("Error", f"An unexpected error occurred:\n{e}")
+
 
 def logout():
     global current_user
@@ -318,8 +346,30 @@ cal.pack(expand=True, fill="both")
 task_frame = tk.Frame(main_frame, bg="#1E1E2E")
 task_frame.pack(side="right", fill="both", expand=True, padx=10)
 
-task_entry = ttk.Entry(task_frame, font=("Segoe UI", 12))
-task_entry.pack(pady=10, fill="x")
+# Frame for task input + time selection
+input_row = tk.Frame(task_frame, bg="#1E1E2E")
+input_row.pack(pady=10, fill="x")
+
+# Task Entry Field
+task_entry = ttk.Entry(input_row, font=("Segoe UI", 12), width=100)
+task_entry.pack(side="left", padx=(0, 10))
+
+# Time values in 12-hour format
+hour_values = [f"{h}:00 {'AM' if h < 12 else 'PM'}" for h in range(1, 13)]
+
+# Start Time
+ttk.Label(input_row, text="Start:", background="#1E1E2E", foreground="white").pack(side="left")
+start_hour = ttk.Combobox(input_row, values=hour_values, width=10)
+start_hour.pack(side="left", padx=(5, 10))
+start_hour.set("6:00 AM")
+
+# End Time
+ttk.Label(input_row, text="End:", background="#1E1E2E", foreground="white").pack(side="left")
+end_hour = ttk.Combobox(input_row, values=hour_values, width=10)
+end_hour.pack(side="left", padx=(5, 0))
+end_hour.set("6:00 PM")
+
+
 
 add_button = ttk.Button(task_frame, text="✔ Add Task", command=add_task)
 add_button.pack(pady=5, fill="x")
