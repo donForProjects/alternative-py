@@ -321,19 +321,19 @@ task_frame.pack(side="right", fill="both", expand=True, padx=10)
 task_entry = ttk.Entry(task_frame, font=("Segoe UI", 12))
 task_entry.pack(pady=10, fill="x")
 
-add_button = ttk.Button(task_frame, text="Add Task", command=add_task)
+add_button = ttk.Button(task_frame, text="✔ Add Task", command=add_task)
 add_button.pack(pady=5, fill="x")
 
-remove_button = ttk.Button(task_frame, text="Remove Task", command=remove_task)
+remove_button = ttk.Button(task_frame, text="✖ Remove Task", command=remove_task)
 remove_button.pack(pady=5, fill="x")
 
-mark_done_button = ttk.Button(task_frame, text="Mark as Done", command=mark_task_as_done)
+mark_done_button = ttk.Button(task_frame, text="👍🏻Mark as Done", command=mark_task_as_done)
 mark_done_button.pack(pady=5, fill="x")
 
-sort_button = ttk.Button(task_frame, text="Sort by Month", command=sort_by_month)
+sort_button = ttk.Button(task_frame, text="🔢 Sort by Month", command=sort_by_month)
 sort_button.pack(pady=5, fill="x")
 
-task_treeview = ttk.Treeview(task_frame, columns=("Date", "Task", "Employee", "Status"), show="headings")
+task_treeview = ttk.Treeview(task_frame, columns=("📅 Date", "📝 Task", "👨🏻‍💻 Employee", "📶 Status"), show="headings")
 task_treeview.pack(expand=True, fill="y")
 
 for col in task_treeview["columns"]:
