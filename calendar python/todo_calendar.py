@@ -8,6 +8,9 @@ from reportlab.lib.pagesizes import letter
 from reportlab.lib import colors
 from reportlab.pdfgen import canvas
 from tkinter import filedialog
+import firebase_admin
+from firebase_admin import credentials
+from firebase_admin import db
 
 # Initialize the tasks dictionary
 tasks = {}
@@ -19,6 +22,17 @@ current_user = ""
 USER_FILE = "users.csv"
 TASK_FILE = "tasks.csv"  # Shared task file for all users
 
+cred = credentials.Certificate("calendar-395f6-firebase-adminsdk-fbsvc-dfe718381e.json")
+default_app = firebase_admin.initialize_app(cred, {
+'databaseURL': 'https://calendar-395f6-default-rtdb.firebaseio.com/'
+})
+
+ref = db.reference("/User")
+ref2 = db.reference("/Task")
+
+
+
+
 # Login Window Function
 def login_window():
     def authenticate():
@@ -27,17 +41,17 @@ def login_window():
         password = password_entry.get()
 
         if username and password:
-            with open(USER_FILE, mode='r') as file:
-                reader = csv.reader(file)
-                for row in reader:
-                    if row[0] == username and row[1] == password:
-                        current_user = username
-                        login_window_instance.destroy()
-                        root.deiconify()
-                        user_label.config(text=f"Logged in as: {current_user}")
-                        load_tasks_from_csv()
-                        return
-                messagebox.showerror("Login Failed", "Invalid username or password!")
+           user_ref = ref.child(username).get()
+
+           if user_ref is not None and user_ref.get('password') == password:
+               current_user = username
+               login_window_instance.destroy()
+               root.deiconify()
+               user_label.config(text=f"Logged in as : {current_user}")
+               load_tasks_from_csv()
+
+           else:
+               messagebox.showerror("Login failed", "Invalid username and password")
         else:
             messagebox.showerror("Input Error", "Please enter both username and password!")
 
@@ -77,16 +91,16 @@ def register_window():
         password = password_entry.get()
 
         if username and password:
-            with open(USER_FILE, mode='r') as file:
-                reader = csv.reader(file)
-                for row in reader:
-                    if row[0] == username:
-                        messagebox.showerror("Registration Failed", "Username already exists!")
-                        return
+            if ref.child(username).get() is not None:
+                messagebox.showerror("Registration Failed", "Username already exists!")
+                return
+            
+            ref.child(username).set({
+                'username': username,
+                'password': password
+            })
 
-            with open(USER_FILE, mode='a', newline='') as file:
-                writer = csv.writer(file)
-                writer.writerow([username, password])
+                
 
             messagebox.showinfo("Success", "You have successfully registered!")
             register_window_instance.destroy()
@@ -191,6 +205,19 @@ def add_task():
             status = "Done"
 
         task_treeview.insert("", "end", values=(date_obj.strftime("%b/%d/%y"), task_with_time, employee, status))
+
+        task_data = {
+            'task': task_with_time,
+            'employee': employee,
+            'status': status,
+            'start_time': start_time,
+            'end_time': end_time
+        }
+
+        task_ref = ref2.child(date_obj.strftime('%Y-%m-%d')).child(employee)
+        task_ref.push(task_data)
+
+
         tasks.setdefault(date_obj, []).append((task_with_time, employee, status))
         task_entry.delete(0, tk.END)
         highlight_dates()
