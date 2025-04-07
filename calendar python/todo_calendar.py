@@ -22,7 +22,7 @@ current_user = ""
 USER_FILE = "users.csv"
 TASK_FILE = "tasks.csv"  # Shared task file for all users
 
-cred = credentials.Certificate("calendar-395f6-firebase-adminsdk-fbsvc-dfe718381e.json")
+cred = credentials.Certificate("calendar-395f6-firebase-adminsdk-fbsvc-89a4863de7.json")
 default_app = firebase_admin.initialize_app(cred, {
 'databaseURL': 'https://calendar-395f6-default-rtdb.firebaseio.com/'
 })
@@ -142,23 +142,39 @@ def save_tasks_to_csv():
             for task, employee, status in task_list:
                 writer.writerow([date_obj.strftime("%m/%d/%y"), task, employee, status])
 
-def load_tasks_from_csv():
-    task_treeview.delete(*task_treeview.get_children())
+
+
+def load_tasks_from_firebase():
+    task_treeview.delete(*task_treeview.get_children())  # Clear existing tasks
     tasks.clear()  # Clear the tasks before reloading
+    
+    # Load tasks from Firebase
     try:
-        with open(get_task_file(), 'r') as file:
-            reader = csv.reader(file)
-            next(reader)
-            for row in reader:
-                if len(row) >= 3:
-                    date_obj = datetime.strptime(row[0], "%m/%d/%y").date()
-                    task, employee, status = row[1], row[2], row[3] if len(row) > 3 else "Upcoming"
-                    tasks.setdefault(date_obj, []).append((task, employee, status))
-                    if status != "Removed":
-                        task_treeview.insert("", "end", values=(date_obj.strftime("%b/%d/%y"), task, employee, status))
-        highlight_dates()
-    except FileNotFoundError:
-        pass
+        # Get all tasks from Firebase under the '/Task' reference
+        tasks_ref = db.reference("/Task")
+        task_data = tasks_ref.get()  # This retrieves all tasks stored in Firebase
+
+        if task_data:
+            # Iterate through the retrieved data and populate the task treeview
+            for date_str, date_tasks in task_data.items():
+                for employee, employee_tasks in date_tasks.items():
+                    for task_entry in employee_tasks:
+                        task = task_entry.get('task')
+                        status = task_entry.get('status', "Upcoming")
+                        start_time = task_entry.get('start_time')
+                        end_time = task_entry.get('end_time')
+
+                        # Convert the Firebase stored date (YYYY-MM-DD) into a datetime object
+                        date_obj = datetime.strptime(date_str, "%Y-%m-%d").date()
+
+                        # Add the task to the tasks dictionary and the treeview
+                        tasks.setdefault(date_obj, []).append((task, employee, status))
+                        if status != "Removed":
+                            task_treeview.insert("", "end", values=(date_obj.strftime("%b/%d/%y"), task, employee, status))
+
+        highlight_dates()  # Update date highlights on the calendar
+    except Exception as e:
+        print(f"Error loading tasks from Firebase: {e}")
 
 def highlight_dates():
     cal.calevent_remove('all')  # Clear previous highlights
