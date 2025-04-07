@@ -264,11 +264,22 @@ def remove_task():
         if item_values:
             date_str, task, employee, status = item_values
             date_obj = datetime.strptime(date_str, "%b/%d/%y").date()
+
+            # Update tasks locally
             if date_obj in tasks:
                 tasks[date_obj] = [
                     (t, e, "Removed") if (t == task and e == employee) else (t, e, s)
                     for (t, e, s) in tasks[date_obj]
                 ]
+            
+            # Update the task in Firebase
+            task_ref = ref2.child(date_obj.strftime('%Y-%m-%d')).child(employee)
+            for task_id, task_info in task_ref.get().items():
+                if task_info.get('task') == task:
+                    task_ref.child(task_id).update({'status': 'Removed'})
+                    break
+            
+            # Remove the task from the Treeview
             task_treeview.delete(selected_item)
             highlight_dates()
             save_tasks_to_csv()
@@ -298,12 +309,21 @@ def mark_task_as_done():
 
         date_obj = datetime.strptime(date_str, "%b/%d/%y").date()
 
+        # Update tasks locally
         if date_obj in tasks:
             tasks[date_obj] = [
                 (t, e, "Done") if (t == task and e == employee) else (t, e, s)
                 for (t, e, s) in tasks[date_obj]
             ]
 
+        # Update the task in Firebase
+        task_ref = ref2.child(date_obj.strftime('%Y-%m-%d')).child(employee)
+        for task_id, task_info in task_ref.get().items():
+            if task_info.get('task') == task:
+                task_ref.child(task_id).update({'status': 'Done'})
+                break
+
+        # Update the Treeview
         task_treeview.item(selected_item, values=(date_str, task, employee, "Done"))
         highlight_dates()
         save_tasks_to_csv()
@@ -453,11 +473,61 @@ TASK_COLORS = {
     "Removed": "#E5E9F0"
 }
 
-def listen_for_changes():
-    ref2.listen(lambda event: load_tasks_from_firebase())
+# Function to listen for updates in Firebase
+def listen_for_task_changes():
+    # Firebase reference to the tasks
+    tasks_ref = ref2
+    
+    # Listen for added tasks
+    tasks_ref.listen("child_added", on_task_added)
+    
+    # Listen for changed tasks (mark as done, removed, etc.)
+    tasks_ref.listen("child_changed", on_task_changed)
+    
+    # Listen for removed tasks
+    tasks_ref.listen("child_removed", on_task_removed)
 
-# Call this function when the app starts
-listen_for_changes()
+# Callback function when a task is added
+def on_task_added(snapshot):
+    task_data = snapshot.val()
+    if task_data:
+        update_treeview_with_task(task_data)
+
+# Callback function when a task is updated (e.g., marked as done or removed)
+def on_task_changed(snapshot):
+    task_data = snapshot.val()
+    if task_data:
+        update_treeview_with_task(task_data)
+
+# Callback function when a task is removed
+def on_task_removed(snapshot):
+    task_data = snapshot.val()
+    if task_data:
+        remove_task_from_treeview(task_data)
+
+# Update the Treeview with the task data
+def update_treeview_with_task(task_data):
+    date_str = task_data.get('date')
+    task = task_data.get('task')
+    employee = task_data.get('employee')
+    status = task_data.get('status')
+
+    # Assuming task_treeview is your Treeview widget:
+    task_treeview.insert("", "end", values=(date_str, task, employee, status))
+
+# Remove task from the Treeview
+def remove_task_from_treeview(task_data):
+    date_str = task_data.get('date')
+    task = task_data.get('task')
+    employee = task_data.get('employee')
+
+    # Iterate through the Treeview to find and remove the matching task
+    for item in task_treeview.get_children():
+        item_values = task_treeview.item(item, "values")
+        if item_values[0] == date_str and item_values[1] == task and item_values[2] == employee:
+            task_treeview.delete(item)
+            break
+
 
 
 login_window()
