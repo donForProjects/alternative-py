@@ -22,7 +22,7 @@ current_user = ""
 USER_FILE = "users.csv"
 TASK_FILE = "tasks.csv"  # Shared task file for all users
 
-cred = credentials.Certificate("calendar-395f6-firebase-adminsdk-fbsvc-89a4863de7.json")
+cred = credentials.Certificate("calendar-395f6-firebase-adminsdk-fbsvc-dfe718381e.json")
 default_app = firebase_admin.initialize_app(cred, {
 'databaseURL': 'https://calendar-395f6-default-rtdb.firebaseio.com/'
 })
@@ -148,44 +148,36 @@ def load_tasks_from_firebase():
     task_treeview.delete(*task_treeview.get_children())  # Clear existing tasks
     tasks.clear()  # Clear the tasks before reloading
 
-    # Load tasks from Firebase
     try:
-        # Get all tasks from Firebase under the '/Task' reference
         tasks_ref = db.reference("/Task")
-        task_data = tasks_ref.get()  # This retrieves all tasks stored in Firebase
+        task_data = tasks_ref.get()  # Retrieve all tasks from Firebase
 
-        print("Fetched task_data:", task_data)  # Debug print to check data structure
+        print("Fetched task_data:", task_data)  # Debug print to check the data structure
 
         if task_data:
-            # Iterate through the retrieved data and populate the task treeview
+            # Iterate through the data correctly, handling the nested structure
             for date_str, date_tasks in task_data.items():
-                try:
-                    # Loop through each employee under that date
-                    for employee, employee_tasks in date_tasks.items():
-                        print(f"Employee: {employee}, Tasks data: {employee_tasks}")  # Debug print
-                        
-                        # If the employee's tasks are stored as a dictionary (not a list), we handle it like this:
-                        if isinstance(employee_tasks, dict):
-                            task = employee_tasks.get('task')
-                            status = employee_tasks.get('status', "Upcoming")
-                            start_time = employee_tasks.get('start_time')
-                            end_time = employee_tasks.get('end_time')
+                for employee, employee_tasks in date_tasks.items():
+                    for task_id, task_info in employee_tasks.items():  # Iterate through the task ids
+                        task = task_info.get('task')
+                        status = task_info.get('status', "Upcoming")
+                        start_time = task_info.get('start_time')
+                        end_time = task_info.get('end_time')
 
-                            # Convert the Firebase stored date (YYYY-MM-DD) into a datetime object
-                            date_obj = datetime.strptime(date_str, "%Y-%m-%d").date()
+                        # Convert the Firebase stored date (YYYY-MM-DD) into a datetime object
+                        date_obj = datetime.strptime(date_str, "%Y-%m-%d").date()
 
-                            # Add the task to the tasks dictionary and the treeview
-                            tasks.setdefault(date_obj, []).append((task, employee, status))
-                            if status != "Removed":
-                                task_treeview.insert("", "end", values=(date_obj.strftime("%b/%d/%y"), task, employee, status))
-                        else:
-                            print(f"Error: Employee {employee} tasks data is not a dictionary.")
-                except Exception as e:
-                    print(f"Error processing tasks for date {date_str}: {e}")
+                        # Add the task to the tasks dictionary and the treeview
+                        tasks.setdefault(date_obj, []).append((task, employee, status))
+                        if status != "Removed":
+                            task_treeview.insert("", "end", values=(date_obj.strftime("%b/%d/%y"), task, employee, status))
 
         highlight_dates()  # Update date highlights on the calendar
     except Exception as e:
         print(f"Error loading tasks from Firebase: {e}")
+
+
+
 
 
 def highlight_dates():
@@ -223,16 +215,12 @@ def add_task():
     task_with_time = f"{task} ({start_time} - {end_time})"
 
     if task:
-        task_with_time = f"{task} ({start_time} - {end_time})"
-
         if date_obj > datetime.today().date():
             status = "Upcoming"
         elif date_obj == datetime.today().date():
             status = "Ongoing"
         else:
             status = "Done"
-
-        task_treeview.insert("", "end", values=(date_obj.strftime("%b/%d/%y"), task_with_time, employee, status))
 
         task_data = {
             'task': task_with_time,
@@ -242,16 +230,30 @@ def add_task():
             'end_time': end_time
         }
 
+        # Add the task to Firebase under the correct date and employee
         task_ref = ref2.child(date_obj.strftime('%Y-%m-%d')).child(employee)
         task_ref.push(task_data)
 
-
+        # Update local tasks dictionary to reflect changes
         tasks.setdefault(date_obj, []).append((task_with_time, employee, status))
+
+        # Add task to Treeview for immediate display
+        task_treeview.insert("", "end", values=(date_obj.strftime("%b/%d/%y"), task_with_time, employee, status))
+        
+        # Clear the task input field
         task_entry.delete(0, tk.END)
+
+        # Update the calendar view and save tasks to CSV
         highlight_dates()
         save_tasks_to_csv()
+
+        # Force reload of tasks from Firebase to synchronize the Treeview with the database
+        load_tasks_from_firebase()
+
     else:
         messagebox.showwarning("Warning", "Task must be filled!")
+
+
 
 
 
@@ -450,6 +452,13 @@ TASK_COLORS = {
     "Done": "#B48EAD",
     "Removed": "#E5E9F0"
 }
+
+def listen_for_changes():
+    ref2.listen(lambda event: load_tasks_from_firebase())
+
+# Call this function when the app starts
+listen_for_changes()
+
 
 login_window()
 root.mainloop()
