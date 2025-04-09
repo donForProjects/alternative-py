@@ -1,0 +1,59 @@
+{% extends 'base.html' %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+<h2>Welcome, {{ user }}!</h2>
+
+<form method="post" class="row g-3">
+    <div class="col-md-4">
+        <input type="text" name="task" placeholder="Task" class="form-control" required>
+    </div>
+    <div class="col-md-3">
+        <input type="date" name="date" class="form-control" required>
+    </div>
+    <div class="col-md-2">
+        <input type="time" name="start" class="form-control" value="09:00" required>
+    </div>
+    <div class="col-md-2">
+        <input type="time" name="end" class="form-control" value="17:00" required>
+    </div>
+    <div class="col-md-1">
+        <button class="btn btn-success w-100">Add</button>
+    </div>
+</form>
+
+<hr>
+
+<table class="table table-striped">
+    <thead>
+        <tr><th>Date</th><th>Task</th><th>Status</th><th>Actions</th></tr>
+    </thead>
+    <tbody>
+        {% for i, task in enumerate(tasks) %}
+        <tr>
+            <td>{{ task[1] }}</td>
+            <td>{{ task[2] }}</td>
+            <td>{{ task[3] }}</td>
+            <td>
+                <a href="{{ url_for('main.delete_task', task_index=i) }}" class="btn btn-danger btn-sm">Delete</a>
+                <a href="{{ url_for('main.send_email', task_index=i) }}" class="btn btn-outline-primary btn-sm">Email</a>
+                <a href="#" class="btn btn-info btn-sm" onclick="confirmMarkAsDone({{ i }})">Mark as Done</a>
+
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>    
+    
+    <script>
+        function confirmMarkAsDone(taskIndex) {
+            const confirmation = confirm("Are you sure you want to mark this task as done?");
+            if (confirmation) {
+                // Properly construct the URL by injecting the taskIndex
+                window.location.href = "{{ url_for('main.mark_as_done', task_index='') }}" + taskIndex;
+            }
+        }
+    </script>
+    
+</table>
+
+<a href="{{ url_for('main.export_pdf') }}" class="btn btn-secondary">Export PDF</a>
+{% endblock %}
