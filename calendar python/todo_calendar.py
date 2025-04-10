@@ -29,7 +29,7 @@ current_user = ""
 USER_FILE = "users.csv"
 TASK_FILE = "tasks.csv"  # Shared task file for all users
 
-cred = credentials.Certificate("calendar-395f6-firebase-adminsdk-fbsvc-c0746a57cf.json")
+cred = credentials.Certificate("calendar-395f6-firebase-adminsdk-fbsvc-751e85c186.json")
 default_app = firebase_admin.initialize_app(cred, {
 'databaseURL': 'https://calendar-395f6-default-rtdb.firebaseio.com/'
 })
@@ -164,23 +164,26 @@ def load_tasks_from_firebase():
         print("Fetched task_data:", task_data)  # Debug print to check the data structure
 
         if task_data:
-            # Iterate through the data correctly, handling the nested structure
             for date_str, date_tasks in task_data.items():
-                for employee, employee_tasks in date_tasks.items():
-                    for task_id, task_info in employee_tasks.items():  # Iterate through the task ids
-                        task = task_info.get('task')
-                        status = task_info.get('status', "Upcoming")
-                        start_time = task_info.get('start_time')
-                        end_time = task_info.get('end_time')
+                if isinstance(date_tasks, dict):  # ✅ safeguard level 1
+                    for employee, employee_tasks in date_tasks.items():
+                        if isinstance(employee_tasks, dict):  # ✅ safeguard level 2
+                            for task_id, task_info in employee_tasks.items():
+                                if isinstance(task_info, dict):  # ✅ safeguard level 3
+                                    task = task_info.get('task')
+                                    status = task_info.get('status', "Upcoming")
+                                    start_time = task_info.get('start_time')
+                                    end_time = task_info.get('end_time')
 
-                        # Convert the Firebase stored date (YYYY-MM-DD) into a datetime object
-                        date_obj = datetime.strptime(date_str, "%Y-%m-%d").date()
+                                    date_obj = datetime.strptime(date_str, "%Y-%m-%d").date()
+                                    tasks.setdefault(date_obj, []).append((task, employee, status))
 
-                        # Add the task to the tasks dictionary and the treeview
-                        tasks.setdefault(date_obj, []).append((task, employee, status))
-                        if status != "Removed":
-                            task_treeview.insert("", "end", values=(date_obj.strftime("%b/%d/%y"), task, employee, status))
-                        
+                                    if status != "Removed":
+                                        task_treeview.insert(
+                                            "", "end",
+                                            values=(date_obj.strftime("%b/%d/%y"), task, employee, status)
+                                        )
+
             # Trigger a notification to all users on task update
             notification.notify(
                 title="Task Update",
