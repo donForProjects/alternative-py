@@ -40,62 +40,86 @@
             <th>Actions</th>
         </tr>
     </thead>
-    <tbody>
-        {% for task in tasks %}
-        <tr>
-            <td>{{ loop.index }}</td>
-            <td>{{ task[0] }}</td> <!-- Date -->
-            <td>{{ task[1] }}</td> <!-- Task Description -->
-            <td>
-                {% if task[2] %}
-                    <img src="{{ url_for('static', filename=task[2]) }}" width="100">
-                {% else %}
-                    No image available
-                {% endif %}
-            </td>
-            <td>{{ task[3] }}</td> <!-- Status -->
-            <td>
-                <a href="{{ url_for('main.delete_task', task_id=task[4], date=task[0]) }}" class="btn btn-danger btn-sm">Delete</a>
-                <a href="{{ url_for('main.send_email', task_id=task[4], date=task[0]) }}" class="btn btn-outline-primary btn-sm">Email</a>
-                <a href="{{ url_for('main.mark_as_done', task_id=task[4], date=task[0]) }}" class="btn btn-info btn-sm">Mark as Done</a>
-                <a href="{{ url_for('main.generate_qr', task_id=task[4], date=task[0]) }}" class="btn btn-secondary btn-sm" download>Download QR</a>
-
-                <form action="{{ url_for('main.upload_picture') }}" method="post" enctype="multipart/form-data" style="display:inline;">
-                    <input type="hidden" name="task_id" value="{{ task[4] }}">
-                    <input type="hidden" name="date" value="{{ task[0] }}">
-                    <input type="file" name="picture" accept="image/*" required>
-                    <button type="submit" class="btn btn-warning btn-sm">Add Picture</button>
-                </form>
-            </td>
-        </tr>
-        {% endfor %}
+    <tbody id="task-body">
+        <!-- JavaScript will populate this -->
     </tbody>
 </table>
 
 <!-- Export PDF Button -->
 <a href="{{ url_for('main.export_pdf') }}" class="btn btn-secondary">Export PDF</a>
 
-<!-- Bootstrap JS and dependencies -->
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-
-{% endblock %}
-
-<script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-database.js"></script>
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
 
 <script>
   const firebaseConfig = {
-    apiKey: "YOUR_KEY",
+    apiKey: "YOUR_API_KEY",
+    authDomain: "calendar-395f6.firebaseapp.com",
     databaseURL: "https://calendar-395f6-default-rtdb.firebaseio.com",
     projectId: "calendar-395f6",
+    storageBucket: "calendar-395f6.appspot.com",
+    messagingSenderId: "YOUR_SENDER_ID",
     appId: "YOUR_APP_ID"
   };
 
-  const app = firebase.initializeApp(firebaseConfig);
+  firebase.initializeApp(firebaseConfig);
   const db = firebase.database();
+  const user = "{{ user }}";
+
+  const tbody = document.getElementById("task-body");
+
+  function renderTasks(data) {
+    tbody.innerHTML = "";
+    let index = 1;
+
+    for (const date in data) {
+      const dayData = data[date];
+      if (!dayData || !dayData[user]) continue;
+
+      const userTasks = dayData[user];
+      for (const taskId in userTasks) {
+        const task = userTasks[taskId];
+        if (task.status === "Removed") continue;
+
+        const imgHTML = task.image
+          ? `<img src="/static/${task.image}" width="100">`
+          : "No image available";
+
+        const row = `
+          <tr>
+            <td>${index++}</td>
+            <td>${date}</td>
+            <td>${task.task}</td>
+            <td>${imgHTML}</td>
+            <td>${task.status}</td>
+            <td>
+              <a href="/delete_task/${taskId}/${date}" class="btn btn-danger btn-sm">Delete</a>
+              <a href="/send_email/${taskId}/${date}" class="btn btn-outline-primary btn-sm">Email</a>
+              <a href="/mark_as_done/${taskId}/${date}" class="btn btn-info btn-sm">Mark as Done</a>
+              <a href="/generate_qr/${taskId}/${date}" class="btn btn-secondary btn-sm" download>Download QR</a>
+
+              <form action="/upload_picture" method="post" enctype="multipart/form-data" style="display:inline;">
+                  <input type="hidden" name="task_id" value="${taskId}">
+                  <input type="hidden" name="date" value="${date}">
+                  <input type="file" name="picture" accept="image/*" required>
+                  <button type="submit" class="btn btn-warning btn-sm">Add Picture</button>
+              </form>
+            </td>
+          </tr>
+        `;
+        tbody.insertAdjacentHTML("beforeend", row);
+      }
+    }
+  }
 
   db.ref("/Task").on("value", (snapshot) => {
-    const data = snapshot.val();
-    // Update the DOM dynamically (replace table content)
+    const taskData = snapshot.val();
+    renderTasks(taskData || {});
   });
 </script>
+
+<!-- Bootstrap JS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+{% endblock %}
