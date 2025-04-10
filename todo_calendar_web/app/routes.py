@@ -9,7 +9,12 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from werkzeug.utils import secure_filename
+from werkzeug.security import generate_password_hash
+from werkzeug.security import check_password_hash
 import qrcode
+import firebase_admin
+from firebase_admin import credentials
+from firebase_admin import db
 
 main = Blueprint('main', __name__)
 
@@ -18,6 +23,12 @@ TASK_FILE = 'tasks.csv'
 UPLOAD_FOLDER = os.path.join('static', 'uploads')
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+if not firebase_admin._apps:
+    cred = credentials.Certificate('app\calendar-395f6-firebase-adminsdk-fbsvc-ca07c66d17.json')
+    firebase_admin.initialize_app(cred, {
+        'databaseURL': 'https://calendar-395f6-default-rtdb.firebaseio.com/'
+    })
 
 # User routes
 @main.route('/')
@@ -30,13 +41,19 @@ def login():
         username = request.form['username']
         password = request.form['password']
 
-        if os.path.exists(USER_FILE):
-            with open(USER_FILE, newline='') as csvfile:
-                reader = csv.DictReader(csvfile)
-                for row in reader:
-                    if row['username'] == username and row['password'] == password:
-                        session['user'] = username
-                        return redirect(url_for('main.dashboard'))
+        if not username or not password:
+            flash('Please enter both username and password!')
+            return redirect(url_for('main.login'))
+
+        users_ref = db.reference('User')
+        user_data = users_ref.child(username).get()
+
+        if user_data:
+            stored_hash = user_data.get('password')
+            if stored_hash and check_password_hash(stored_hash, password):
+                session['user'] = username
+                return redirect(url_for('main.dashboard'))
+
         flash('Invalid credentials')
 
     return render_template('login.html')
@@ -52,21 +69,22 @@ def register():
         username = request.form['username']
         password = request.form['password']
 
-        if os.path.exists(USER_FILE):
-            with open(USER_FILE, newline='') as csvfile:
-                reader = csv.DictReader(csvfile)
-                for row in reader:
-                    if row['username'] == username:
-                        flash('Username already exists')
-                        return redirect(url_for('main.register'))
+        if not username or not password:
+            flash('Please enter both username and password!')
+            return redirect(url_for('main.register'))
 
-        write_header = not os.path.exists(USER_FILE)
-        with open(USER_FILE, 'a', newline='') as csvfile:
-            fieldnames = ['username', 'password']
-            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-            if write_header:
-                writer.writeheader()
-            writer.writerow({'username': username, 'password': password})
+        users_ref = db.reference('User')
+
+        # Check if user already exists
+        if users_ref.child(username).get() is not None:
+            flash('Username already exists!')
+            return redirect(url_for('main.register'))
+
+        # Save new user with hashed password
+        users_ref.child(username).set({
+            'username': username,
+            'password': generate_password_hash(password)
+        })
 
         flash('Registration successful! Please log in.')
         return redirect(url_for('main.login'))
@@ -79,40 +97,65 @@ def dashboard():
     if 'user' not in session:
         return redirect(url_for('main.login'))
 
+    user = session['user']
+    
+    # Handle task submission
     if request.method == 'POST':
         task = request.form['task']
         date = request.form['date']
         start_time = request.form['start']
         end_time = request.form['end']
-        user = session['user']
+
         status = "Upcoming" if datetime.strptime(date, "%Y-%m-%d").date() > datetime.today().date() else "Ongoing"
 
-        with open(TASK_FILE, 'a', newline='') as csvfile:
-            writer = csv.writer(csvfile)
-            writer.writerow([user, date, f"{task} ({start_time} - {end_time})", status])
+        # Generate a unique task ID using datetime
+        task_id = f"{user}_{datetime.now().strftime('%Y%m%d%H%M%S')}"
+
+        task_ref = db.reference(f"/Task/{date}/{user}/{task_id}")
+        task_ref.set({
+            'task': task,
+            'start_time': start_time,
+            'end_time': end_time,
+            'status': status
+        })
 
         flash('Task added successfully!')
 
+    # Fetch tasks for the current user
     tasks = []
     try:
-        with open(TASK_FILE, 'r') as csvfile:
-            reader = csv.reader(csvfile)
-            for row in reader:
-                if row[0] == session['user']:  # Only load tasks for the current user
-                    tasks.append(row)
-    except FileNotFoundError:
-        tasks = []
+        tasks_ref = db.reference("/Task")
+        all_tasks = tasks_ref.get()
 
-    # Load available image filenames from the uploads folder
+        if all_tasks:
+            for date_str, date_tasks in all_tasks.items():
+                if user in date_tasks:
+                    user_tasks = date_tasks[user]
+                    for task_id, task_info in user_tasks.items():
+                        task = task_info.get('task')
+                        status = task_info.get('status', 'Upcoming')
+                        start_time = task_info.get('start_time')
+                        end_time = task_info.get('end_time')
+
+                        tasks.append([
+                            user,
+                            date_str,
+                            f"{task} ({start_time} - {end_time})",
+                            status
+                        ])
+    except Exception as e:
+        flash(f"Error loading tasks: {e}")
+
+    # Load image filenames from uploads folder
     image_folder = os.path.join('static', 'uploads')
     image_files = set(os.listdir(image_folder)) if os.path.exists(image_folder) else set()
 
     return render_template(
         'dashboard.html',
-        user=session['user'],
+        user=user,
         tasks=tasks,
-        enumerate=enumerate,  # So you can use enumerate in Jinja
-        image_files=image_files  # Pass image files to the template
+        enumerate=enumerate,
+        image_files=image_files
     )
 
 @main.route('/mark_as_done/<task_index>', methods=['GET'])
@@ -209,6 +252,8 @@ def upload_picture():
                     writer = csv.writer(f)
                     writer.writerows(tasks)
 
+                print("THIS WORKS")
+                print("it saves")
                 flash("Picture uploaded successfully!")
             else:
                 flash("Invalid task index.")
