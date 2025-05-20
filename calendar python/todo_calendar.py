@@ -29,7 +29,7 @@ current_user = ""
 USER_FILE = "users.csv"
 TASK_FILE = "tasks.csv"  # Shared task file for all users
 
-cred = credentials.Certificate("calendar-395f6-firebase-adminsdk-fbsvc-751e85c186.json")
+cred = credentials.Certificate("calendar-395f6-firebase-adminsdk-fbsvc-287199d6e9.json")
 default_app = firebase_admin.initialize_app(cred, {
 'databaseURL': 'https://calendar-395f6-default-rtdb.firebaseio.com/'
 })
@@ -68,7 +68,7 @@ def login_window():
 
     login_window_instance = tk.Toplevel()
     login_window_instance.title("Login")
-    login_window_instance.geometry("300x220")
+    login_window_instance.geometry("600x400")
     login_window_instance.configure(bg="#1E1E2E")
 
     label = ttk.Label(login_window_instance, text="Login", font=("Segoe UI", 14, "bold"))
