@@ -1,0 +1,42 @@
+{% extends 'base.html' %}
+{% block title %}Register{% endblock %}
+
+{% block content %}
+<style>
+    .register-card {
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .register-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+    }
+
+    .form-control:focus {
+        border-color: #198754;
+        box-shadow: 0 0 0 0.2rem rgba(25, 135, 84, 0.25);
+    }
+</style>
+
+<div class="container mt-5 d-flex justify-content-center align-items-center" style="min-height: 80vh;">
+    <div class="card register-card shadow-lg p-4" style="width: 100%; max-width: 400px;">
+        <div class="card-body">
+            <h3 class="card-title text-center mb-4 text-success">📝 Create an Account</h3>
+            <form method="post">
+                <div class="mb-3">
+                    <label for="username" class="form-label">👤 Username</label>
+                    <input type="text" class="form-control" id="username" name="username" required placeholder="Choose a username">
+                </div>
+                <div class="mb-3">
+                    <label for="password" class="form-label">🔒 Password</label>
+                    <input type="password" class="form-control" id="password" name="password" required placeholder="Create a password">
+                </div>
+                <div class="d-grid gap-2">
+                    <button type="submit" class="btn btn-success">Register</button>
+                    <a href="{{ url_for('main.login') }}" class="btn btn-outline-secondary">Back to Login</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
