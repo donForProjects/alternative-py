@@ -17,6 +17,8 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.application import MIMEApplication
 from tkinter import simpledialog
+import tkinter as tk
+from PIL import Image, ImageTk
 
 
 # Initialize the tasks dictionary
@@ -29,7 +31,7 @@ current_user = ""
 USER_FILE = "users.csv"
 TASK_FILE = "tasks.csv"  # Shared task file for all users
 
-cred = credentials.Certificate("calendar-395f6-firebase-adminsdk-fbsvc-287199d6e9.json")
+cred = credentials.Certificate("calendar-395f6-firebase-adminsdk-fbsvc-37a953df77.json")
 default_app = firebase_admin.initialize_app(cred, {
 'databaseURL': 'https://calendar-395f6-default-rtdb.firebaseio.com/'
 })
@@ -69,26 +71,45 @@ def login_window():
     login_window_instance = tk.Toplevel()
     login_window_instance.title("Login")
     login_window_instance.geometry("600x400")
+    login_window_instance.resizable(False, False)
     login_window_instance.configure(bg="#1E1E2E")
+    
+    image = Image.open("logo.png")  # Replace with your image path
+    image = image.resize((250, 120))  # Resize for better UI balance
+    photo = ImageTk.PhotoImage(image)
+    login_window_instance.image = photo  # Prevent garbage collection
 
-    label = ttk.Label(login_window_instance, text="Login", font=("Segoe UI", 14, "bold"))
-    label.pack(pady=10)
-
+    # Keep a reference to avoid garbage collection
+    image_label = tk.Label(login_window_instance, image=photo, bg="#1E1E2E")
+    image_label.pack(pady=(20, 10))  # Space above and below image
+    
+    label = ttk.Label(login_window_instance, text="Login", font=("Segoe UI", 16, "bold"), background="#1E1E2E", foreground="white")
+    label.pack(pady=(0, 10))
+    
     username_label = ttk.Label(login_window_instance, text="Username:")
     username_label.pack()
     username_entry = ttk.Entry(login_window_instance)
     username_entry.pack(pady=5)
-
+    
     password_label = ttk.Label(login_window_instance, text="Password:")
     password_label.pack()
     password_entry = ttk.Entry(login_window_instance, show="*")
     password_entry.pack(pady=5)
-
+    
     login_button = ttk.Button(login_window_instance, text="Login", command=authenticate)
-    login_button.pack(pady=10)
-
+    login_button.pack(pady=(10, 5))
+    
     register_button = ttk.Button(login_window_instance, text="Register", command=show_register_window)
     register_button.pack()
+    
+    login_window_instance.update_idletasks()
+    window_width = 600
+    window_height = 400
+    screen_width = login_window_instance.winfo_screenwidth()
+    screen_height = login_window_instance.winfo_screenheight()
+    x = (screen_width // 2) - (window_width // 2)
+    y = (screen_height // 2) - (window_height // 2)
+    login_window_instance.geometry(f"{window_width}x{window_height}+{x}+{y}")
 
     login_window_instance.mainloop()
 
@@ -117,24 +138,48 @@ def register_window():
 
     register_window_instance = tk.Toplevel()
     register_window_instance.title("Register")
-    register_window_instance.geometry("300x220")
+    register_window_instance.geometry("600x400")
+    register_window_instance.resizable(False, False)
     register_window_instance.configure(bg="#1E1E2E")
 
-    label = ttk.Label(register_window_instance, text="Create Account", font=("Segoe UI", 14, "bold"))
-    label.pack(pady=10)
+    # Load and display the image
+    image = Image.open("logo.png")  # Replace with your image path
+    image = image.resize((250, 120))  # Resize as needed
+    photo = ImageTk.PhotoImage(image)
+    register_window_instance.image = photo  # Prevent garbage collection
 
+    image_label = tk.Label(register_window_instance, image=photo, bg="#1E1E2E")
+    image_label.pack(pady=(20, 10))
+
+    # Title
+    label = ttk.Label(register_window_instance, text="Create Account", font=("Segoe UI", 16, "bold"), background="#1E1E2E", foreground="white")
+    label.pack(pady=(0, 10))
+
+    # Username input
     username_label = ttk.Label(register_window_instance, text="Username:")
     username_label.pack()
     username_entry = ttk.Entry(register_window_instance)
     username_entry.pack(pady=5)
 
+    # Password input
     password_label = ttk.Label(register_window_instance, text="Password:")
     password_label.pack()
     password_entry = ttk.Entry(register_window_instance, show="*")
     password_entry.pack(pady=5)
 
+    # Register button
     register_button = ttk.Button(register_window_instance, text="Register", command=register_user)
     register_button.pack(pady=10)
+
+    # Center the window
+    register_window_instance.update_idletasks()
+    window_width = 600
+    window_height = 400
+    screen_width = register_window_instance.winfo_screenwidth()
+    screen_height = register_window_instance.winfo_screenheight()
+    x = (screen_width // 2) - (window_width // 2)
+    y = (screen_height // 2) - (window_height // 2)
+    register_window_instance.geometry(f"{window_width}x{window_height}+{x}+{y}")
 
     register_window_instance.mainloop()
 
@@ -550,7 +595,7 @@ root.withdraw()
 style = ttk.Style()
 style.theme_use("clam")
 style.configure("TLabel", background="#1E1E2E", foreground="white", font=("Segoe UI", 10))
-style.configure("TButton", background="#4C566A", foreground="white", font=("Segoe UI", 10), padding=6)
+style.configure("TButton", background="#4C566A", foreground="white", font=("Segoe UI", 10), padding=5)
 style.map("TButton", background=[("active", "#5E81AC")])
 style.configure("TCombobox", fieldbackground="#3B4252", background="#3B4252", foreground="white")
 style.configure("Treeview", background="#2E3440", fieldbackground="#2E3440", foreground="white", font=("Segoe UI", 10))
@@ -562,77 +607,86 @@ user_label.pack(anchor="w", padx=10, pady=(10, 0))
 logout_button = ttk.Button(root, text="🔒 Logout", command=logout)
 logout_button.pack(anchor="w", padx=10, pady=(0, 10))
 
-# Frame to hold the export buttons side by side
+# Export Buttons
 export_buttons_frame = ttk.Frame(root)
 export_buttons_frame.pack(anchor="w", padx=10, pady=(0, 10))
 
 export_button = ttk.Button(export_buttons_frame, text="📄 Export to PDF", command=export_to_pdf)
-export_button.pack(side="left", padx=(0, 5))  # slight space between buttons
+export_button.pack(side="left", padx=(0, 5))
 
 export_letter_button = ttk.Button(export_buttons_frame, text="✉ Export as Letter", command=export_selected_task_as_letter)
-export_letter_button.pack(side="left")
+export_letter_button.pack(side="left", padx=5)
 
 send_email_button = ttk.Button(export_buttons_frame, text="📧 Send to Email", command=send_task_email)
 send_email_button.pack(side="left")
 
-
-
+# Main Layout
 main_frame = tk.Frame(root, bg="#1E1E2E")
 main_frame.pack(expand=True, fill="both", padx=10, pady=10)
 
+# Calendar Section
 calendar_frame = tk.Frame(main_frame, bg="#1E1E2E")
 calendar_frame.pack(side="left", fill="both", expand=True)
 
-cal = Calendar(calendar_frame, selectmode='day', background="#3B4252", foreground="white",
-               selectbackground="#5E81AC", headersbackground="#2E3440", font=("Segoe UI", 10), 
-               date_pattern="mm/dd/yyyy", cursor="hand2")
-cal.pack(expand=True, fill="both")
+cal = Calendar(calendar_frame, selectmode='day',
+               background="#3B4252", foreground="white",
+               selectbackground="#5E81AC", headersbackground="#2E3440",
+               font=("Segoe UI", 12), date_pattern="mm/dd/yyyy",
+               cursor="hand2", borderwidth=2)
+cal.pack(padx=5, pady=5, expand=True, fill="both")
+calendar_frame.config(width=500, height=700)
+calendar_frame.pack_propagate(False)
 
+# Task Section
 task_frame = tk.Frame(main_frame, bg="#1E1E2E")
-task_frame.pack(side="right", fill="both", expand=True, padx=10)
+task_frame.pack(side="right", fill="both", expand=False, padx=10)
 
-# Frame for task input + time selection
+# Task Input Row
 input_row = tk.Frame(task_frame, bg="#1E1E2E")
-input_row.pack(pady=10, fill="x")
+input_row.pack(pady=(0, 10), fill="x")
 
-# Task Entry Field
-task_entry = ttk.Entry(input_row, font=("Segoe UI", 12), width=100)
+task_entry = ttk.Entry(input_row, font=("Segoe UI", 10), width=40)
 task_entry.pack(side="left", padx=(0, 10))
 
-# Time values in 12-hour format
 hour_values = [f"{h}:00 {'AM' if h < 12 else 'PM'}" for h in range(1, 13)]
 
-# Start Time
 ttk.Label(input_row, text="Start:", background="#1E1E2E", foreground="white").pack(side="left")
 start_hour = ttk.Combobox(input_row, values=hour_values, width=10)
 start_hour.pack(side="left", padx=(5, 10))
 start_hour.set("6:00 AM")
 
-# End Time
 ttk.Label(input_row, text="End:", background="#1E1E2E", foreground="white").pack(side="left")
 end_hour = ttk.Combobox(input_row, values=hour_values, width=10)
 end_hour.pack(side="left", padx=(5, 0))
 end_hour.set("6:00 PM")
 
+# Buttons
+for btn_text, cmd in [
+    ("✔ Add Task", add_task),
+    ("✖ Remove Task", remove_task),
+    ("👍🏻 Mark as Done", mark_task_as_done),
+    ("🔢 Sort by Month", sort_by_month)
+]:
+    ttk.Button(task_frame, text=btn_text, command=cmd).pack(pady=3, fill="x")
 
+# Treeview
+task_treeview = ttk.Treeview(
+    task_frame,
+    columns=("📅 Date", "📝 Task", "👨🏻‍💻 Employee", "📶 Status"),
+    show="headings",
+    height=10
+)
+task_treeview.pack(expand=False, fill="both", pady=(10, 0))
 
-add_button = ttk.Button(task_frame, text="✔ Add Task", command=add_task)
-add_button.pack(pady=5, fill="x")
-
-remove_button = ttk.Button(task_frame, text="✖ Remove Task", command=remove_task)
-remove_button.pack(pady=5, fill="x")
-
-mark_done_button = ttk.Button(task_frame, text="👍🏻Mark as Done", command=mark_task_as_done)
-mark_done_button.pack(pady=5, fill="x")
-
-sort_button = ttk.Button(task_frame, text="🔢 Sort by Month", command=sort_by_month)
-sort_button.pack(pady=5, fill="x")
-
-task_treeview = ttk.Treeview(task_frame, columns=("📅 Date", "📝 Task", "👨🏻‍💻 Employee", "📶 Status"), show="headings")
-task_treeview.pack(expand=True, fill="y")
+# Set column widths
+task_treeview.column("📅 Date", width=100, anchor="center")
+task_treeview.column("📝 Task", width=250, anchor="w")
+task_treeview.column("👨🏻‍💻 Employee", width=150, anchor="center")
+task_treeview.column("📶 Status", width=100, anchor="center")
 
 for col in task_treeview["columns"]:
     task_treeview.heading(col, text=col)
+
 
 TASK_COLORS = {
     "Upcoming": "#D08770",
