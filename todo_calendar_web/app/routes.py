@@ -23,7 +23,7 @@ ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 if not firebase_admin._apps:
-    cred = credentials.Certificate('app/templates/calendar-395f6-firebase-adminsdk-fbsvc-287199d6e9.json')
+    cred = credentials.Certificate('app/templates/calendar-395f6-firebase-adminsdk-fbsvc-37a953df77.json')
     firebase_admin.initialize_app(cred, {
         'databaseURL': 'https://calendar-395f6-default-rtdb.firebaseio.com/'
     })
@@ -116,25 +116,17 @@ def dashboard():
             for date_str, date_tasks in all_tasks.items():
                 if user in date_tasks:
                     for task_id, task_info in date_tasks[user].items():
-                        # Handle images field: can be list or single string or missing
-                        images = task_info.get('images') or []
-                        if isinstance(images, str):
-                            images = [images]
-                        elif not isinstance(images, list):
-                            images = []
-
-                        tasks.append({
-                            'date': date_str,
-                            'description': f"{task_info.get('task')} ({task_info.get('start')} - {task_info.get('end')})",
-                            'images': images,
-                            'status': task_info.get('status', 'Upcoming'),
-                            'task_id': task_id
-                        })
+                        tasks.append([
+                            date_str,
+                            f"{task_info.get('task')} ({task_info.get('start')} - {task_info.get('end')})",
+                            task_info.get('image'),
+                            task_info.get('status', 'Upcoming'),
+                            task_id
+                        ])
     except Exception as e:
         flash(f"Error loading tasks: {e}")
 
     return render_template("dashboard.html", user=user, tasks=tasks)
-
 
 
 @main.route('/mark_as_done/<task_id>/<date>', methods=['GET'])
@@ -169,40 +161,31 @@ def upload_picture():
     if 'user' not in session:
         return redirect(url_for('main.login'))
 
-    files = request.files.getlist('picture')  # Handle multiple files
+    picture = request.files['picture']
     task_id = request.form['task_id']
     date = request.form['date']
     user = session['user']
 
-    uploaded_images = []
+    if picture and allowed_file(picture.filename):
+        filename = secure_filename(picture.filename)
 
-    for picture in files:
-        if picture and allowed_file(picture.filename):
-            filename = secure_filename(picture.filename)
-            relative_path = os.path.join('uploads', f"task_{task_id}_{filename}").replace('\\', '/')
-            absolute_path = os.path.join(UPLOAD_FOLDER, f"task_{task_id}_{filename}")
+        # Relative path stored in DB and used in URLs
+        relative_path = os.path.join('uploads', f"task_{task_id}_{filename}").replace('\\', '/')
 
-            os.makedirs(os.path.dirname(absolute_path), exist_ok=True)
-            picture.save(absolute_path)
+        # Absolute path to save the uploaded file
+        absolute_path = os.path.join(UPLOAD_FOLDER, f"task_{task_id}_{filename}")
 
-            if os.path.exists(absolute_path):
-                uploaded_images.append(relative_path)
-            else:
-                flash(f"Failed to save {filename}.")
+        os.makedirs(os.path.dirname(absolute_path), exist_ok=True)
+        picture.save(absolute_path)
 
-    if uploaded_images:
-        # Get current images if they exist
-        task_ref = db.reference(f"/Task/{date}/{user}/{task_id}")
-        current_data = task_ref.get()
-        current_images = current_data.get("images", []) if current_data else []
+        if os.path.exists(absolute_path):
+            db.reference(f"/Task/{date}/{user}/{task_id}/image").set(relative_path)
+            flash("Picture uploaded and linked successfully!")
+        else:
+            flash("Failed to save picture.")
 
-        # Append new images and update Firebase
-        updated_images = current_images + uploaded_images
-        task_ref.update({"images": updated_images})
-
-        flash(f"{len(uploaded_images)} image(s) uploaded and linked successfully!")
     else:
-        flash("No valid image files uploaded.")
+        flash("Invalid file or no file selected.")
 
     return redirect(url_for('main.dashboard'))
 
@@ -330,51 +313,3 @@ def generate_qr_code(task_url):
     qr.save(img_io, 'PNG')
     img_io.seek(0)
     return img_io
-
-def convert_images():
-    ref = db.reference("/Task")
-    task_data = ref.get()
-
-    results = []
-
-    if not isinstance(task_data, dict):
-        print("❌ Error: /Task is not a dict or is empty", flush=True)
-        return results  # return empty list
-
-    print(f"✅ Loaded /Task: {len(task_data)} dates", flush=True)
-
-    for date, users in task_data.items():
-        if not isinstance(users, dict):
-            print(f"⚠️ Skipping {date} — users is not dict: {type(users)}", flush=True)
-            continue
-
-        for user, tasks in users.items():
-            if not isinstance(tasks, dict):
-                print(f"⚠️ Skipping user {user} — tasks not dict: {type(tasks)}", flush=True)
-                continue
-
-            for task_id, task in tasks.items():
-                if not isinstance(task, dict):
-                    print(f"⚠️ Task {task_id} is not dict: {type(task)}", flush=True)
-                    continue
-
-                images = task.get("images") or task.get("image")
-                # Normalize to list
-                if isinstance(images, str):
-                    images = [images]
-                elif not isinstance(images, list):
-                    images = []
-
-                if images:
-                    results.append({
-                        "date": date,
-                        "user": user,
-                        "task_id": task_id,
-                        "task": task.get("task", ""),
-                        "images": images,
-                        "status": task.get("status", "Upcoming")
-                    })
-
-    print(f"✅ Found {len(results)} tasks with images", flush=True)
-    return results
-

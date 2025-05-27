@@ -12,16 +12,37 @@
         box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
     }
 
+    /* Focus effect with red theme */
     .form-control:focus {
-        border-color: #198754;
-        box-shadow: 0 0 0 0.2rem rgba(25, 135, 84, 0.25);
+        border-color: #dc3545;
+        box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.25);
+        transition: all 0.3s ease-in-out;
+    }
+
+    /* Title color red */
+    .text-danger {
+        color: #dc3545 !important;
+    }
+
+    /* Button hover animations */
+    .btn-danger:hover {
+        background-color: #b02a37;
+        transform: translateY(-1px);
+        transition: 0.2s ease-in-out;
+    }
+
+    .btn-outline-secondary:hover {
+        background-color: #f8f9fa;
+        color: #333;
+        transform: translateY(-1px);
+        transition: 0.2s ease-in-out;
     }
 </style>
 
 <div class="container mt-5 d-flex justify-content-center align-items-center" style="min-height: 80vh;">
     <div class="card register-card shadow-lg p-4" style="width: 100%; max-width: 400px;">
         <div class="card-body">
-            <h3 class="card-title text-center mb-4 text-success">📝 Create an Account</h3>
+            <h3 class="card-title text-center mb-4 text-danger">📝 Create an Account</h3>
             <form method="post">
                 <div class="mb-3">
                     <label for="username" class="form-label">👤 Username</label>
@@ -31,12 +52,28 @@
                     <label for="password" class="form-label">🔒 Password</label>
                     <input type="password" class="form-control" id="password" name="password" required placeholder="Create a password">
                 </div>
+
+                <!-- Show Password Toggle -->
+                <div class="form-check mb-3">
+                    <input class="form-check-input" type="checkbox" id="showPasswordCheck" onclick="togglePassword()">
+                    <label class="form-check-label" for="showPasswordCheck">
+                        Show Password
+                    </label>
+                </div>
+
                 <div class="d-grid gap-2">
-                    <button type="submit" class="btn btn-success">Register</button>
+                    <button type="submit" class="btn btn-danger">Register</button>
                     <a href="{{ url_for('main.login') }}" class="btn btn-outline-secondary">Back to Login</a>
                 </div>
             </form>
         </div>
     </div>
 </div>
+
+<script>
+  function togglePassword() {
+    const passwordInput = document.getElementById("password");
+    passwordInput.type = passwordInput.type === "password" ? "text" : "password";
+  }
+</script>
 {% endblock %}
